@@ -11,7 +11,7 @@ android {
 
     defaultConfig {
         applicationId "app.tek4tv.digitalsignage"
-        minSdkVersion 25
+        minSdkVersion 23
         targetSdkVersion 28
         versionCode 1
         versionName "1.0"
