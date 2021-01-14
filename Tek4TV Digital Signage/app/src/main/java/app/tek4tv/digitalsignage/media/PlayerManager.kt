@@ -19,10 +19,7 @@ class PlayerManager(
         private var applicationContext: Context,
         private var lifecycleScope: CoroutineScope,
         private var viewModel: MainViewmodel,
-
-        var mVideoLayout: VLCVideoLayout?,
-
-        )
+        var mVideoLayout: VLCVideoLayout?)
 {
     private val USE_TEXTURE_VIEW = false
     private val ENABLE_SUBTITLES = true
@@ -32,7 +29,13 @@ class PlayerManager(
     val mLibVLC: LibVLC
     val audioPlayer: CustomPlayer
     val visualPlayer: CustomPlayer
+
     var mainPlayer: CustomPlayer? = null
+        set(value)
+        {
+            field = value
+            setMainPlayerEventListener()
+        }
 
     var audioList = listOf<Uri>()
 
@@ -44,9 +47,9 @@ class PlayerManager(
         args.add("--avcodec-codec=h264")
         args.add("--network-caching=2000")
         args.add("--no-http-reconnect")
-        args.add("--file-logging")
-        args.add("--logfile=vlc-log.txt")
 
+        /*args.add("--file-logging")
+        args.add("--logfile=vlc-log.txt")*/
 
         mLibVLC = LibVLC(applicationContext, args)
         visualPlayer = CustomPlayer(mLibVLC)
@@ -58,6 +61,7 @@ class PlayerManager(
     fun attachVisualPlayerView()
     {
         visualPlayer.attachViews(mVideoLayout!!, null, ENABLE_SUBTITLES, USE_TEXTURE_VIEW)
+        mVideoLayout!!.rotation = 180f
     }
 
     fun playMediaByIndex(index: Int)
@@ -69,58 +73,40 @@ class PlayerManager(
             if (playlist == null || playlist.isEmpty()) return
             val mediaItem = viewModel.playlist.value!![index]
             val media = mediaItem.getVlcMedia(mLibVLC)
+
             presentImageJob?.cancel()
 
             mainPlayer?.eventListener = {}
+            visualPlayer.eventListener = {}
+            audioPlayer.eventListener = {}
 
             when (mediaItem.getMediaType())
             {
                 MediaType.VIDEO ->
                 {
                     Log.d("mediaplayed", "video")
-                    audioPlayer.stop()
-                    media.addOption(":fullscreen")
-                    mainPlayer = visualPlayer
-                    visualPlayer.play(media)
 
-                    mainPlayer!!.type = "video"
+                    if (mediaItem.muted)
+                    {
+                        mainPlayer = audioPlayer
+                        playMutedVideo(mediaItem)
+                    } else
+                    {
+                        audioPlayer.stop()
+                        media.addOption(":fullscreen")
+
+                        mainPlayer = visualPlayer
+                        visualPlayer.play(media)
+                    }
                 }
                 MediaType.IMAGE ->
                 {
                     Log.d("mediaplayed", "audio")
                     presentImage(mediaItem)
                     mainPlayer = audioPlayer
-
-                    mainPlayer!!.type = "audio"
                 }
                 else ->
                 {
-                }
-            }
-
-            if (mainPlayer != null)
-            {
-                mainPlayer!!.eventListener = { event ->
-                    when (event)
-                    {
-                        MediaPlayer.Event.EndReached ->
-                        {
-                            playNextMedia()
-                            //remove callback
-                            mainPlayer!!.eventListener = {}
-                        }
-
-                        MediaPlayer.Event.EncounteredError ->
-                        {
-                            presentImageJob?.cancel()
-                            presentImageJob = null
-
-                            playNextMedia()
-                            mainPlayer!!.eventListener = {}
-                        }
-                        MediaPlayer.Event.Stopped -> viewModel.isPlaying = false
-                        MediaPlayer.Event.Playing -> viewModel.isPlaying = true
-                    }
                 }
             }
 
@@ -132,8 +118,41 @@ class PlayerManager(
         }
     }
 
+    private fun playMutedVideo(videoItem: MediaItem)
+    {
+        val video = videoItem.getVlcMedia(mLibVLC)
+        visualPlayer.media = video
+        visualPlayer.play()
 
-    fun presentImage(mediaItem: MediaItem)
+
+        visualPlayer.eventListener = { event ->
+            when (event)
+            {
+                MediaPlayer.Event.EndReached ->
+                {
+                    mVideoLayout!!.post {
+                        visualPlayer.media = video
+                        visualPlayer.play()
+                    }
+                }
+
+                MediaPlayer.Event.EncounteredError ->
+                {
+                    presentImageJob?.cancel()
+                    presentImageJob = null
+
+                    visualPlayer.eventListener = {}
+
+                    playNextMedia()
+                }
+            }
+        }
+
+        playRandomAudio()
+    }
+
+
+    private fun presentImage(mediaItem: MediaItem)
     {
 
         val imageList = mutableListOf(mediaItem)
@@ -141,8 +160,27 @@ class PlayerManager(
         if (!viewModel.playlist.value.isNullOrEmpty())
             imageList.addAll(viewModel.playlist.value!!.filter { it.getMediaType() == MediaType.IMAGE })
 
-        val delayDuration = 30000L//getDurationInSecond(duration) * 1000 / imageList.size
+        val delayDuration = 15000L
 
+        playRandomAudio()
+
+        presentImageJob = lifecycleScope.launch {
+            var playedMainImage = false
+            while (true)
+            {
+                val media = if (!playedMainImage)
+                {
+                    playedMainImage = true
+                    mediaItem
+                } else imageList.random()
+                visualPlayer.play(media.getVlcMedia(mLibVLC))
+                delay(delayDuration)
+            }
+        }
+    }
+
+    private fun playRandomAudio()
+    {
         if (audioList.isEmpty())
             audioList = viewModel.getAudioList(applicationContext)
 
@@ -153,20 +191,6 @@ class PlayerManager(
                     audioList.random()
             )
             audioPlayer.play(backgroundAudio)
-        }
-
-
-        presentImageJob = lifecycleScope.launch {
-            var i = 0
-            while (i < imageList.size && isActive)
-            {
-                val media = imageList[i++]
-                visualPlayer.play(media.getVlcMedia(mLibVLC))
-                delay(delayDuration)
-
-                if (i >= imageList.size)
-                    i = 0
-            }
         }
     }
 
@@ -180,6 +204,35 @@ class PlayerManager(
                 viewModel.playlistIndex = 0
 
             playMediaByIndex(viewModel.playlistIndex)
+        }
+    }
+
+    private fun setMainPlayerEventListener()
+    {
+        if (mainPlayer != null)
+        {
+            mainPlayer!!.eventListener = { event ->
+                when (event)
+                {
+                    MediaPlayer.Event.EndReached ->
+                    {
+                        playNextMedia()
+                        //remove callback
+                        mainPlayer!!.eventListener = {}
+                    }
+
+                    MediaPlayer.Event.EncounteredError ->
+                    {
+                        presentImageJob?.cancel()
+                        presentImageJob = null
+
+                        playNextMedia()
+                        mainPlayer!!.eventListener = {}
+                    }
+                    MediaPlayer.Event.Stopped -> viewModel.isPlaying = false
+                    MediaPlayer.Event.Playing -> viewModel.isPlaying = true
+                }
+            }
         }
     }
 

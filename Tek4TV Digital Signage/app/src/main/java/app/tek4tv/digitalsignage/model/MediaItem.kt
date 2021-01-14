@@ -11,41 +11,39 @@ import java.io.Serializable
 
 @JsonClass(generateAdapter = true)
 data class MediaItem(
-    @Json(name = "Index")
-    var index: String? = null,
+        @Json(name = "Index")
+        var index: String? = null,
 
-    @Json(name = "Name")
-    var name: String? = null,
+        @Json(name = "Name")
+        var name: String? = null,
 
-    @Json(name = "ID")
-    var id: Long = 0,
+        @Json(name = "ID")
+        var id: Long = 0,
 
-    @Json(name = "Duration")
-    var duration: String? = null,
+        @Json(name = "Duration")
+        var duration: String? = null,
 
-    @Json(name = "Path")
-    var path: String = "",
+        @Json(name = "Path")
+        var path: String = "",
 
-    @Json(name = "Start")
-    var start: String? = null,
+        @Json(name = "Start")
+        var start: String? = null,
 
-    @Json(name = "End")
-    var end: String? = null,
+        @Json(name = "End")
+        var end: String? = null,
 
-    @Json(name = "Edit")
-    var edit: Boolean = false,
+        @Json(name = "Edit")
+        var edit: Boolean = false,
 
-    @Json(name = "Category")
-    var category: Category? = null,
+        @Json(name = "Category")
+        var category: Category? = null,
 
-    var isCheck: Boolean = false,
+        var isCheck: Boolean = false,
 
-    @Json(name = "FixTime")
-    var fixTime: String = "",
+        @Json(name = "FixTime")
+        var fixTime: String = "",
 
-    var played: Boolean = false,
-
-    var lastPlay: Long = -1L
+        var muted: Boolean = false
 ) : Serializable {
 
     var pathBackup: String = ""

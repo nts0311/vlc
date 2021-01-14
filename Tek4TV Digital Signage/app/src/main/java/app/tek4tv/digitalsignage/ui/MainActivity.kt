@@ -9,22 +9,17 @@ import android.util.Log
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
-import app.tek4tv.digitalsignage.CrashHandler
-import app.tek4tv.digitalsignage.HubConnectionTask
+import app.tek4tv.digitalsignage.HubManager
 import app.tek4tv.digitalsignage.R
 import app.tek4tv.digitalsignage.media.PlayerManager
 import app.tek4tv.digitalsignage.model.*
 import app.tek4tv.digitalsignage.utils.*
 import app.tek4tv.digitalsignage.viewmodels.MainViewmodel
-import com.microsoft.signalr.HubConnection
-import com.microsoft.signalr.HubConnectionBuilder
 import com.squareup.moshi.Moshi
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.*
 import org.videolan.libvlc.*
 import org.videolan.libvlc.util.VLCVideoLayout
-import java.io.File
-import java.text.SimpleDateFormat
 import java.util.*
 import javax.inject.Inject
 
@@ -38,45 +33,37 @@ class MainActivity : AppCompatActivity()
 
     private val viewModel by viewModels<MainViewmodel>()
 
-    private var hubConnection: HubConnection? = null
-
     @Inject
     lateinit var moshi: Moshi
 
-    private var pingHubJob: Job? = null
-
-    private lateinit var audioManager: AudioManager
-
-    private var lastPing = ""
-
+    private lateinit var hubManager: HubManager
     private lateinit var playerManager: PlayerManager
+    private lateinit var audioManager: AudioManager
 
 
     override fun onCreate(savedInstanceState: Bundle?)
     {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
-
-        Thread.setDefaultUncaughtExceptionHandler(CrashHandler(this))
+        // TODO : add crash handler to app when building for customer
+        //Thread.setDefaultUncaughtExceptionHandler(CrashHandler(this))
 
         //Rotate screen
-        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE
 
         if (needGrantPermission())
-            requestUpdatePermission()
+            requestAppPermission()
 
         mVideoLayout = findViewById(R.id.video_layout)
         playerManager = PlayerManager(applicationContext, lifecycleScope, viewModel, mVideoLayout)
 
         NetworkUtils.instance.startNetworkListener(this)
 
-        NetworkUtils.instance.mNetworkLive.observe(this)
-        { isConnected ->
-            if (isConnected)
-                initHubConnect()
-        }
-
         audioManager = getSystemService(AUDIO_SERVICE) as AudioManager
+
+        hubManager = HubManager(lifecycleScope, this, viewModel, moshi) { command, message ->
+            handleFromCommandServer(command, message)
+        }
 
         initHubConnect()
         registerObservers()
@@ -116,12 +103,9 @@ class MainActivity : AppCompatActivity()
                         && grantResults[0] == PackageManager.PERMISSION_GRANTED
                 )
                 {
-
                 } else
                 {
-
                 }
-                return
             }
         }
     }
@@ -150,7 +134,7 @@ class MainActivity : AppCompatActivity()
         return needGrantPermission
     }
 
-    private fun requestUpdatePermission()
+    private fun requestAppPermission()
     {
         val permissions = arrayOf(
                 Manifest.permission.WRITE_EXTERNAL_STORAGE,
@@ -195,75 +179,30 @@ class MainActivity : AppCompatActivity()
                 if (!viewModel.isPlaying)
                     startPlayingMedia()
 
-                if (hubConnection == null)
+                if (hubManager.hubConnection == null)
                 {
-
-                    connectToHub()
-
+                    hubManager.createNewHubConnection()
                     Log.d("Connected", "Connected")
                 }
             } else
             {
-                //hubConnection = null
+                hubManager.hubConnection = null
             }
 
         }
     }
 
-    private fun connectToHub()
-    {
-        hubConnection = HubConnectionBuilder.create(NetworkUtils.URL_HUB).build()
-
-        HubConnectionTask { connectionId ->
-            if (connectionId != null)
-            {
-                Log.d("Connected", connectionId)
-                pingTimer()
-            }
-        }.execute(hubConnection)
-        onMessage()
-    }
-
-    private fun onMessage()
-    {
-        hubConnection?.on(
-                "ReceiveMessage",
-                { command: String?, message: String? ->
-                    runOnUiThread {
-                        Log.d("command", command ?: "")
-                        Log.d("message", message ?: "")
-                        handleFromCommandServer(command, message)
-                    }
-                },
-                String::class.java,
-                String::class.java
-        )
-    }
-
-    // ham gui du lieu
-    private fun sendMessage(mess: String, command: String)
-    {
-        try
-        {
-            hubConnection!!.invoke(command, Utils.getDeviceId(applicationContext), mess)
-        } catch (e: Exception)
-        {
-            e.printStackTrace()
-            //connectToHub()
-        }
-    }
-
-    private fun playURLVideo(index: Int)
+    private fun playMediaItemByIndex(index: Int)
     {
         viewModel.playlistIndex = index
         playerManager.playMediaByIndex(viewModel.playlistIndex)
     }
 
-    private fun handleFromCommandServer(commamd: String?, message: String?)
+    private fun handleFromCommandServer(command: String?, message: String?)
     {
         try
         {
-            if (commamd == null || commamd.isEmpty())
+            if (command == null || command.isEmpty())
             {
                 return
             }
@@ -272,23 +211,17 @@ class MainActivity : AppCompatActivity()
                 return
             }
             //count_ping_hub = 0
-            var reponseHub = ReponseHub()
+            var responseHub = ReponseHub()
             if (message.startsWith("{"))
             {
                 val jsonAdapter = moshi.adapter(ReponseHub::class.java)
-                reponseHub = jsonAdapter.fromJson(message)!!
+                responseHub = jsonAdapter.fromJson(message)!!
             }
 
-            if (commamd == Status.PONG)
-            {
-                lastPing = message
-                Log.d("last ping", lastPing)
-            }
-
-            val isImei = Utils.getDeviceId(applicationContext) == reponseHub.imei
+            val isImei = Utils.getDeviceId(applicationContext) == responseHub.imei
             if (isImei)
             {
-                when (commamd)
+                when (command)
                 {
                     Status.GET_LIST ->
                     {
@@ -306,17 +239,16 @@ class MainActivity : AppCompatActivity()
                     }
                     Status.JUMP ->
                     {
-                        Log.d(commamd, message)
-                        val id = reponseHub.message!!.trim().toInt()
-                        val volume = reponseHub.volume
-                        playURLVideo(id)
+                        Log.d(command, message)
+                        val id = responseHub.message!!.trim().toInt()
+                        playMediaItemByIndex(id)
                     }
                     Status.LIVE ->
                     {
                         /*volume = reponseHub.getVolume()
                         playURLVideo(reponseHub.getMessage().trim(), false)*/
                     }
-                    Status.UPDATE_STATUS -> pingHub(true)
+                    Status.UPDATE_STATUS -> hubManager.pingHub(true)
                     Status.GET_LOCATION ->
                     {
                     }
@@ -344,13 +276,13 @@ class MainActivity : AppCompatActivity()
                     }
                     Status.SET_MUTE_DEVICE ->
                     {
-                        if (reponseHub.message != null)
-                            setMute(reponseHub.message!!)
+                        if (responseHub.message != null)
+                            setMute(responseHub.message!!)
                     }
                     Status.SET_VOLUME_DEVICE ->
                     {
-                        if (reponseHub.message != null)
-                            setVolume(reponseHub.message!!)
+                        if (responseHub.message != null)
+                            setVolume(responseHub.message!!)
                     }
                     Status.GET_VOLUME_DEVICE ->
                     {
@@ -374,21 +306,21 @@ class MainActivity : AppCompatActivity()
 
                     Status.UPDATE_VERSION ->
                     {
-                        if (reponseHub.message != null)
+                        if (responseHub.message != null)
                         {
-                            Log.d("update", reponseHub.message!!)
-                            downloadUpdateApk(reponseHub.message!!, this)
+                            Log.d("update", responseHub.message!!)
+                            downloadUpdateApk(responseHub.message!!, this)
                         }
                     }
 
                     Status.UPDATE_MUSIC ->
                     {
-                        if (reponseHub.message != null)
+                        if (responseHub.message != null)
                         {
-                            Log.d("Update Music", reponseHub.message!!)
+                            Log.d("Update Music", responseHub.message!!)
                             viewModel.getAudioListFromNetwork(
                                     applicationContext,
-                                    reponseHub.message!!
+                                    responseHub.message!!
                             )
 
                             playerManager.audioList = viewModel.getAudioList(applicationContext)
@@ -401,105 +333,6 @@ class MainActivity : AppCompatActivity()
         } catch (e: java.lang.Exception)
         {
             e.printStackTrace()
-        }
-    }
-
-    private fun pingHub(isUpdate: Boolean)
-    {
-        try
-        {
-            /*if (!isUpdate) {
-                if (count_ping_hub > 1) {
-                    if (hubConnection == null) {
-                        connectHub()
-                    } else {
-                        hubConnection!!.start()
-                    }
-                }
-            }*/
-            if (!this@MainActivity.isFinishing && hubConnection != null)
-            {
-                // send ping_hub || update_status
-                //  val date: String = simpleDateFormat.format(Date())
-                Log.d("test", "ping hub")
-                var request: PingHubRequest? = null
-
-                val i = viewModel.playlistIndex
-                Log.d("player:", java.lang.String.valueOf(i))
-                //if (i >= 0 && i < mainViewModel.lstLiveData.getValue().size()) {
-
-                var mode = "-1"
-
-                if (!viewModel.playlist.value.isNullOrEmpty())
-                {
-                    val path = viewModel.playlist.value!![i].path!!
-                    mode = if (path.isNotEmpty() && !File(path).exists()) "1"
-                    else "0"
-                }
-
-                val video = Video("" + i, mode)
-
-                val videoAdapter = moshi.adapter(Video::class.java)
-
-                request = PingHubRequest().apply {
-                    imei = Utils.getDeviceId(applicationContext)
-                    status = "START"
-                    connectionId = (hubConnection!!.connectionId)
-                    this.video = videoAdapter.toJson(video)
-                    val dateformat = SimpleDateFormat("dd/MM/yyyy HH:mm:ss")
-                    startTine = dateformat.format(Date())
-                }
-
-
-                //count_ping_hub = count_ping_hub + 1
-                val requestAdater = moshi.adapter(PingHubRequest::class.java)
-                sendMessage(requestAdater.toJson(request), Utils.ping)
-                Log.d("request", requestAdater.toJson(request))
-            }
-        } catch (e: java.lang.Exception)
-        {
-            e.printStackTrace()
-
-        }
-    }
-
-    private fun pingTimer()
-    {
-        pingHubJob?.cancel()
-        pingHubJob = lifecycleScope.launchWhenResumed {
-            while (true)
-            {
-                pingHub(true)
-                Log.d("pingtimer", "ping")
-                delay(15000)
-
-                val dateformat = SimpleDateFormat("dd/MM/yyyy HH:mm:ss")
-                if (lastPing != "")
-                {
-                    try
-                    {
-
-                        val now = Calendar.getInstance()
-                        val lastPingTime = Calendar.getInstance().apply {
-                            time = dateformat.parse(lastPing)
-                        }
-
-                        if (now.timeInMillis - lastPingTime.timeInMillis > 45000)
-                        {
-                            Log.e("reconnecet", "Losed hub connection")
-
-                            if (hubConnection != null)
-                                hubConnection!!.stop()
-
-                            connectToHub()
-                        }
-                    } catch (e: Exception)
-                    {
-                        Log.e("reconnecet", e.message)
-                        e.printStackTrace()
-                    }
-                }
-            }
         }
     }
 
