@@ -25,8 +25,9 @@ import java.io.File
 
 
 class MainViewmodel @ViewModelInject constructor(
-    private val playlistRepo: PlaylistRepo
-) : ViewModel() {
+        private val playlistRepo: PlaylistRepo
+) : ViewModel()
+{
 
     var isPlaying: Boolean = false
     val playlist = MutableLiveData<List<MediaItem>>()
@@ -38,7 +39,10 @@ class MainViewmodel @ViewModelInject constructor(
 
     var playlistIndex = 0
 
-    fun getPlaylist(context: Context, needUpdate: Boolean) {
+    var currentOrientation = -1
+
+    fun getPlaylist(context: Context, needUpdate: Boolean)
+    {
         if (getPlaylistJob != null) return
 
         getPlaylistJob = viewModelScope.launch {
@@ -48,18 +52,22 @@ class MainViewmodel @ViewModelInject constructor(
         }
     }
 
-    fun checkPlaylist(appContext: Context) {
+    fun checkPlaylist(appContext: Context)
+    {
         if (checkPlaylistJob != null) return
 
         checkPlaylistJob = viewModelScope.launch {
-            while (true) {
+            while (true)
+            {
                 val curPlaylist = playlist.value
-                if (curPlaylist != null && curPlaylist.isNotEmpty()) {
+                if (curPlaylist != null && curPlaylist.isNotEmpty())
+                {
 
                     var foundBrokenPath = false
                     curPlaylist.forEach {
                         val mediaPath = it.path
-                        if (mediaPath.isNotEmpty() && !File(mediaPath).exists()) {
+                        if (mediaPath.isNotEmpty() && !File(mediaPath).exists())
+                        {
                             if (it.pathBackup.startsWith("http"))
                                 it.path = it.pathBackup
                             foundBrokenPath = true
@@ -84,7 +92,8 @@ class MainViewmodel @ViewModelInject constructor(
     }
 
     @Synchronized
-    fun downloadMedias(appContext: Context) {
+    fun downloadMedias(appContext: Context)
+    {
         viewModelScope.launch {
             downloadMediaJob?.join()
             downloadMediaJob = launch {
@@ -93,37 +102,46 @@ class MainViewmodel @ViewModelInject constructor(
         }
     }
 
-    private fun startDownloadMedia(appContext: Context) {
+    private fun startDownloadMedia(appContext: Context)
+    {
         val storagePath = appContext.filesDir.path
-        if (!playlist.value.isNullOrEmpty()) {
+        if (!playlist.value.isNullOrEmpty())
+        {
             val listVideo = playlist.value!!
             listVideo.forEach {
                 val url = it.path
 
-                if (!url.isNullOrEmpty() && url.startsWith("http")) {
+                if (!url.isNullOrEmpty() && url.startsWith("http"))
+                {
                     var fileName = File(Uri.parse(url).path).name
 
                     val slash = fileName.lastIndexOf("\\")
 
-                    if (slash != -1) {
+                    if (slash != -1)
+                    {
                         fileName = fileName.substring(slash + 1)
                     }
 
-                    if (!isFileExisted(storagePath, fileName)) {
+                    if (!isFileExisted(storagePath, fileName))
+                    {
                         PRDownloader.download(url, storagePath, fileName).build()
-                            .start(object : OnDownloadListener {
-                                override fun onDownloadComplete() {
-                                    it.pathBackup = it.path
-                                    it.path = "$storagePath/$fileName"
-                                    savePlaylist(listVideo, storagePath)
-                                    Log.d("downloadcomplete", it.path)
-                                }
+                                .start(object : OnDownloadListener
+                                {
+                                    override fun onDownloadComplete()
+                                    {
+                                        it.pathBackup = it.path
+                                        it.path = "$storagePath/$fileName"
+                                        savePlaylist(listVideo, storagePath)
+                                        Log.d("downloadcomplete", it.path)
+                                    }
 
-                                override fun onError(error: Error?) {
-                                    Log.d("downloaderror", it.path)
-                                }
-                            })
-                    } else {
+                                    override fun onError(error: Error?)
+                                    {
+                                        Log.d("downloaderror", it.path)
+                                    }
+                                })
+                    } else
+                    {
                         it.path = "$storagePath/$fileName"
                         savePlaylist(listVideo, storagePath)
                     }
@@ -132,19 +150,21 @@ class MainViewmodel @ViewModelInject constructor(
         }
     }
 
-    fun savePlaylist(listVideo: List<MediaItem>, storagePath: String) {
+    fun savePlaylist(listVideo: List<MediaItem>, storagePath: String)
+    {
         viewModelScope.launch {
             saveFileJob?.join()
             saveFileJob = launch {
                 playlistRepo.savePlaylistToFile(
-                    listVideo,
-                    storagePath
+                        listVideo,
+                        storagePath
                 )
             }
         }
     }
 
-    fun getAudioListFromNetwork(appContext: Context, url: String) {
+    fun getAudioListFromNetwork(appContext: Context, url: String)
+    {
         viewModelScope.launch(Dispatchers.Default) {
             val audioPaths = playlistRepo.getAudioList(url)
             if (audioPaths.isNotEmpty())
@@ -152,15 +172,20 @@ class MainViewmodel @ViewModelInject constructor(
         }
     }
 
-    fun getAudioList(appContext: Context): List<Uri> {
-        return try {
+    fun getAudioList(appContext: Context): List<Uri>
+    {
+        return try
+        {
             val audioFolderPath = "${appContext.filesDir.path}${File.separator}$AUDIO_FOLDER_NAME"
             getAllFileNameInFolder(audioFolderPath)
-                .map { Uri.parse("file://$audioFolderPath${File.separator}$it") }
+                    .map { Uri.parse("file://$audioFolderPath${File.separator}$it") }
 
-        } catch (e: Exception) {
+        } catch (e: Exception)
+        {
             Log.e("MainViewmodel", "Error getting audio list")
             listOf()
         }
     }
+
+
 }

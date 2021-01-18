@@ -27,4 +27,5 @@ object Status {
     const val UPDATE_VERSION = "UPDATE_VERSION"
     const val UPDATE_MUSIC = "UPDATE_MUSIC"
     const val PONG = "PONG"
+    const val ROTATION = "ROTATION"
 }

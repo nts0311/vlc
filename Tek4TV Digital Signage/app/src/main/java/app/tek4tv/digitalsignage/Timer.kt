@@ -20,7 +20,7 @@ class Timer(private val lifecycleScope: CoroutineScope)
 
     fun start()
     {
-        tickJob = lifecycleScope.launch(Dispatchers.Default) {
+        tickJob = lifecycleScope.launch {
             while (true)
             {
                 val now = Calendar.getInstance()
@@ -66,6 +66,18 @@ class Timer(private val lifecycleScope: CoroutineScope)
     {
         val listenerId = id++
         timeListeners[listenerId] = listener
+        return listenerId
+    }
+
+    fun addTimeListener(dispatcher: CoroutineDispatcher, listener: suspend (Long) -> Unit): Long
+    {
+        val listenerId = id++
+        timeListeners[listenerId] = {
+            withContext(dispatcher)
+            {
+                listener.invoke(it)
+            }
+        }
         return listenerId
     }
 

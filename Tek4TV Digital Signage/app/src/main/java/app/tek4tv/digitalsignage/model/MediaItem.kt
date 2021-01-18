@@ -43,6 +43,7 @@ data class MediaItem(
         @Json(name = "FixTime")
         var fixTime: String = "",
 
+        @Json(name = "Mute")
         var muted: Boolean = false
 ) : Serializable {
 

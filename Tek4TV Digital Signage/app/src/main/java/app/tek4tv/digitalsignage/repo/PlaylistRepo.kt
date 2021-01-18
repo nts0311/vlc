@@ -59,7 +59,7 @@ class PlaylistRepo @Inject constructor(
                 }
             }
         } catch (e: Exception) {
-            Log.d("yee", e.toString())
+            Log.e("yee", e.toString())
         }
 
         return result
@@ -77,7 +77,7 @@ class PlaylistRepo @Inject constructor(
             try {
                 writeFile(filePath, json)
             } catch (e: IOException) {
-                Log.d(LOG_TAG, "error writing playlist!!!")
+                Log.e(LOG_TAG, "error writing playlist!!!")
             }
         }
     }
@@ -94,7 +94,7 @@ class PlaylistRepo @Inject constructor(
                 var contentFromFile = readFile(filePath)
                 result = jsonAdapter.fromJson(contentFromFile) ?: listOf()
             } catch (e: IOException) {
-                Log.d(LOG_TAG, "error reading playlist!!!")
+                Log.e(LOG_TAG, "error reading playlist!!!")
             }
 
         }

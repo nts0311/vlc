@@ -3,6 +3,7 @@ package app.tek4tv.digitalsignage.media
 import android.content.Context
 import android.net.Uri
 import android.util.Log
+import app.tek4tv.digitalsignage.Timer
 import app.tek4tv.digitalsignage.model.MediaItem
 import app.tek4tv.digitalsignage.model.MediaType
 import app.tek4tv.digitalsignage.model.getDurationInSecond
@@ -21,10 +22,13 @@ class PlayerManager(
         private var viewModel: MainViewmodel,
         var mVideoLayout: VLCVideoLayout?)
 {
-    private val USE_TEXTURE_VIEW = false
+    private val USE_TEXTURE_VIEW = true
     private val ENABLE_SUBTITLES = true
     private var checkScheduledMediaJob: Job? = null
     private var presentImageJob: Job? = null
+
+    private var timer: Timer
+    private var checkScheduledMediaListenerId = -1L
 
     val mLibVLC: LibVLC
     val audioPlayer: CustomPlayer
@@ -37,7 +41,10 @@ class PlayerManager(
             setMainPlayerEventListener()
         }
 
+    var currentPlaylist = listOf<MediaItem>()
     var audioList = listOf<Uri>()
+
+    var mode = 1
 
     init
     {
@@ -51,6 +58,9 @@ class PlayerManager(
         /*args.add("--file-logging")
         args.add("--logfile=vlc-log.txt")*/
 
+        timer = Timer(lifecycleScope)
+        timer.start()
+
         mLibVLC = LibVLC(applicationContext, args)
         visualPlayer = CustomPlayer(mLibVLC)
         audioPlayer = CustomPlayer(mLibVLC)
@@ -60,18 +70,48 @@ class PlayerManager(
 
     fun attachVisualPlayerView()
     {
-        visualPlayer.attachViews(mVideoLayout!!, null, ENABLE_SUBTITLES, USE_TEXTURE_VIEW)
-        mVideoLayout!!.rotation = 180f
+        if (mode == 0)
+        {
+            visualPlayer.attachViews(mVideoLayout!!, null, ENABLE_SUBTITLES, false)
+        } else
+        {
+            mVideoLayout!!.rotation = 180.0f
+            visualPlayer.attachViews(mVideoLayout!!, null, ENABLE_SUBTITLES, true)
+        }
     }
+
+    fun switchViewOrientation(ori: Int)
+    {
+        visualPlayer.stop()
+        visualPlayer.detachViews()
+
+        mode = ori
+
+        attachVisualPlayerView()
+
+        playMediaByIndex(0)
+    }
+
+    fun setPlaylistContent(playlist: List<MediaItem>, audios: List<Uri>)
+    {
+        this.currentPlaylist = playlist
+        this.audioList = audios
+
+        viewModel.playlistIndex = 0
+
+        if (currentPlaylist.isNotEmpty())
+            playMediaByIndex(0)
+    }
+
 
     fun playMediaByIndex(index: Int)
     {
         try
         {
-            val playlist = viewModel.playlist.value
+            val playlist = currentPlaylist
 
-            if (playlist == null || playlist.isEmpty()) return
-            val mediaItem = viewModel.playlist.value!![index]
+            if (playlist.isEmpty()) return
+            val mediaItem = playlist[index]
             val media = mediaItem.getVlcMedia(mLibVLC)
 
             presentImageJob?.cancel()
@@ -94,7 +134,6 @@ class PlayerManager(
                     {
                         audioPlayer.stop()
                         media.addOption(":fullscreen")
-
                         mainPlayer = visualPlayer
                         visualPlayer.play(media)
                     }
@@ -198,7 +237,7 @@ class PlayerManager(
     private fun playNextMedia()
     {
         mVideoLayout!!.post {
-            val playlist = viewModel.playlist.value!!
+            val playlist = currentPlaylist
             viewModel.playlistIndex++
             if (viewModel.playlistIndex >= playlist.size)
                 viewModel.playlistIndex = 0
@@ -236,12 +275,81 @@ class PlayerManager(
         }
     }
 
+    private fun checkScheduledMediaList()
+    {
+        checkScheduledMediaListenerId = timer.addTimeListener {
+            val currentTime = Calendar.getInstance()
+
+
+        }
+    }
+
     fun checkScheduledMedia()
     {
         checkScheduledMediaJob?.cancel()
-        checkScheduledMediaJob = lifecycleScope.launch(Dispatchers.Default) {
 
-            val playlist = viewModel.playlist.value ?: listOf()
+        val playlist = currentPlaylist
+        val scheduledItems: MutableList<MediaItem> = mutableListOf()
+        scheduledItems.addAll(playlist.filter { it.fixTime.isNotEmpty() && it.fixTime != "00:00:00" })
+
+        timer.addTimeListener(Dispatchers.Default) {
+            if (scheduledItems.isEmpty())
+            {
+                scheduledItems.addAll(playlist.filter { it.fixTime.isNotEmpty() && it.fixTime != "00:00:00" })
+            }
+
+
+            var index = -1
+
+            scheduledItems.forEachIndexed { i, mediaItem ->
+                try
+                {
+                    val time = mediaItem.fixTime.split(":").map { it.toInt() }
+
+                    val now = Calendar.getInstance()
+
+                    val scheduledTime = Calendar.getInstance().apply {
+                        set(Calendar.HOUR_OF_DAY, time[0])
+                        set(Calendar.MINUTE, time[1])
+                        set(Calendar.SECOND, time[2])
+                    }
+
+                    val mediaDuration = getDurationInSecond(mediaItem.duration ?: "00:00:00")
+
+                    if (scheduledTime.timeInMillis <= now.timeInMillis
+                            && now.timeInMillis <= scheduledTime.timeInMillis + mediaDuration * 1000
+                    )
+                    {
+                        Log.d(
+                                "hengio",
+                                "${now.timeInMillis} - ${scheduledTime.timeInMillis} - ${scheduledTime.timeInMillis + mediaDuration * 1000}"
+                        )
+                        index = i
+                    }
+
+                } catch (e: Exception)
+                {
+                    Log.e("checkScheduledMedia", "error checking media fixtime")
+                }
+            }
+
+            if (index != -1 && index < scheduledItems.size)
+            {
+                withContext(Dispatchers.Main)
+                {
+                    val indexToPlay = playlist.indexOf(scheduledItems[index])
+
+                    playMediaByIndex(indexToPlay)
+                    Log.d("Scheduled", "play scheduled $indexToPlay")
+                    viewModel.playlistIndex = indexToPlay
+                    scheduledItems.removeAt(index)
+                }
+            }
+        }
+
+        /*checkScheduledMediaJob = lifecycleScope.launch(Dispatchers.Default) {
+
+            val playlist = currentPlaylist
             val scheduledItems: MutableList<MediaItem> = mutableListOf()
             scheduledItems.addAll(playlist.filter { it.fixTime.isNotEmpty() && it.fixTime != "00:00:00" })
 
@@ -305,7 +413,7 @@ class PlayerManager(
 
                 delay(1000)
             }
-        }
+        }*/
     }
 
     fun onActivityStop()
@@ -313,6 +421,7 @@ class PlayerManager(
         mainPlayer?.stop()
         audioPlayer.stop()
         visualPlayer.stop()
+        timer.stop()
         visualPlayer.detachViews()
     }
 

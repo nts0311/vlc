@@ -1,13 +1,18 @@
 package app.tek4tv.digitalsignage.ui
 
 import android.Manifest
+import android.content.SharedPreferences
 import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
 import android.media.AudioManager
 import android.os.Bundle
 import android.util.Log
+import android.view.View
+import android.widget.FrameLayout
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
+import androidx.constraintlayout.widget.ConstraintLayout
+import androidx.core.content.edit
 import androidx.lifecycle.lifecycleScope
 import app.tek4tv.digitalsignage.HubManager
 import app.tek4tv.digitalsignage.R
@@ -27,9 +32,21 @@ import javax.inject.Inject
 @AndroidEntryPoint
 class MainActivity : AppCompatActivity()
 {
-    private val UPDATE_PERMISSION_REQUEST_CODE = 1
 
-    private var mVideoLayout: VLCVideoLayout? = null
+    private val UPDATE_PERMISSION_REQUEST_CODE = 1
+    private val PREF_ORIENTATION = "pref_orientation"
+
+    private val permissions = arrayOf(
+            Manifest.permission.WRITE_EXTERNAL_STORAGE,
+            Manifest.permission.READ_EXTERNAL_STORAGE,
+            Manifest.permission.REQUEST_INSTALL_PACKAGES,
+            Manifest.permission.INTERNET,
+            Manifest.permission.ACCESS_NETWORK_STATE,
+            Manifest.permission.READ_PHONE_STATE,
+            Manifest.permission.WRITE_SETTINGS
+    )
+
+    private lateinit var mVideoLayout: VLCVideoLayout
 
     private val viewModel by viewModels<MainViewmodel>()
 
@@ -40,6 +57,9 @@ class MainActivity : AppCompatActivity()
     private lateinit var playerManager: PlayerManager
     private lateinit var audioManager: AudioManager
 
+    private lateinit var preference: SharedPreferences
+    var d = 0.0f
+    var i = 0
 
     override fun onCreate(savedInstanceState: Bundle?)
     {
@@ -48,14 +68,17 @@ class MainActivity : AppCompatActivity()
         // TODO : add crash handler to app when building for customer
         //Thread.setDefaultUncaughtExceptionHandler(CrashHandler(this))
 
-        //Rotate screen
-        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE
+        preference = getPreferences(MODE_PRIVATE)
+        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+
 
         if (needGrantPermission())
             requestAppPermission()
 
         mVideoLayout = findViewById(R.id.video_layout)
         playerManager = PlayerManager(applicationContext, lifecycleScope, viewModel, mVideoLayout)
+        val orientation = preference.getInt(PREF_ORIENTATION, 1)
+        playerManager.mode = orientation
 
         NetworkUtils.instance.startNetworkListener(this)
 
@@ -64,6 +87,8 @@ class MainActivity : AppCompatActivity()
         hubManager = HubManager(lifecycleScope, this, viewModel, moshi) { command, message ->
             handleFromCommandServer(command, message)
         }
+
+
 
         initHubConnect()
         registerObservers()
@@ -112,15 +137,6 @@ class MainActivity : AppCompatActivity()
 
     private fun needGrantPermission(): Boolean
     {
-        val permissions = arrayOf(
-                Manifest.permission.WRITE_EXTERNAL_STORAGE,
-                Manifest.permission.READ_EXTERNAL_STORAGE,
-                Manifest.permission.REQUEST_INSTALL_PACKAGES,
-                Manifest.permission.INTERNET,
-                Manifest.permission.ACCESS_NETWORK_STATE,
-                Manifest.permission.READ_PHONE_STATE
-        )
-
         var needGrantPermission = false
 
         permissions.forEach {
@@ -136,14 +152,6 @@ class MainActivity : AppCompatActivity()
 
     private fun requestAppPermission()
     {
-        val permissions = arrayOf(
-                Manifest.permission.WRITE_EXTERNAL_STORAGE,
-                Manifest.permission.READ_EXTERNAL_STORAGE,
-                Manifest.permission.REQUEST_INSTALL_PACKAGES,
-                Manifest.permission.INTERNET,
-                Manifest.permission.ACCESS_NETWORK_STATE,
-                Manifest.permission.READ_PHONE_STATE
-        )
         requestPermissions(permissions, UPDATE_PERMISSION_REQUEST_CODE)
     }
 
@@ -152,14 +160,16 @@ class MainActivity : AppCompatActivity()
     {
         viewModel.playlist.observe(this)
         {
+            playerManager.setPlaylistContent(it, viewModel.getAudioList(applicationContext))
+
             playerManager.checkScheduledMedia()
 
             viewModel.downloadMedias(applicationContext)
 
 
-            if (viewModel.playlist.value != null && viewModel.playlistIndex >= viewModel.playlist.value!!.size)
+            /*if (viewModel.playlist.value != null && viewModel.playlistIndex >= viewModel.playlist.value!!.size)
                 viewModel.playlistIndex = 0
-            playerManager.playMediaByIndex(viewModel.playlistIndex)
+            playerManager.playMediaByIndex(viewModel.playlistIndex)*/
         }
     }
 
@@ -168,6 +178,7 @@ class MainActivity : AppCompatActivity()
         viewModel.getPlaylist(applicationContext, false)
         viewModel.checkPlaylist(applicationContext)
     }
+
 
     private fun initHubConnect()
     {
@@ -326,6 +337,30 @@ class MainActivity : AppCompatActivity()
                             playerManager.audioList = viewModel.getAudioList(applicationContext)
                         }
                     }
+                    Status.ROTATION ->
+                    {
+
+
+                        if (responseHub.message != null)
+                        {
+                            Log.d("rotation", responseHub.message.toString())
+                            try
+                            {
+                                val requireOrientation = responseHub.message!!.toInt()
+                                preference.edit {
+                                    putInt(PREF_ORIENTATION, requireOrientation)
+                                }
+
+                                playerManager.switchViewOrientation(requireOrientation)
+
+                                //setScreenOrientation(getOrientation(requireOrientation))
+                            } catch (e: Exception)
+                            {
+                                Log.e("orientation", "Error parsing orientation")
+                            }
+                        }
+
+                    }
 
 
                 }
@@ -362,5 +397,38 @@ class MainActivity : AppCompatActivity()
         }
 
         audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, volume, AudioManager.FLAG_SHOW_UI)
+    }
+
+    fun getOrientation(requestOri: Int): Int
+    {
+        return when (requestOri)
+        {
+            1 -> ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+            2 -> ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+            3 -> ActivityInfo.SCREEN_ORIENTATION_REVERSE_PORTRAIT
+            4 -> ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE
+            else -> ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+        }
+    }
+
+    fun testOrientation()
+    {
+        val mParentLayout = findViewById(R.id.video_layout) as View
+        mParentLayout.rotation = d
+        val lp = ConstraintLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
+        mParentLayout.layoutParams = lp
+
+
+        /* val displayMetrics = DisplayMetrics()
+         getWindowManager().getDefaultDisplay().getMetrics(displayMetrics)
+
+         val height = displayMetrics.heightPixels
+         val width = displayMetrics.widthPixels
+         val offset = (width - height) / 2
+         val lp = FrameLayout.LayoutParams(height, width)
+         mParentLayout.layoutParams = lp
+         mParentLayout.rotation = 180.0f
+         mParentLayout.translationX = offset.toFloat()
+         mParentLayout.translationY = -offset.toFloat()*/
     }
 }
