@@ -14,6 +14,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.content.edit
 import androidx.lifecycle.lifecycleScope
+import app.tek4tv.digitalsignage.CrashHandler
 import app.tek4tv.digitalsignage.HubManager
 import app.tek4tv.digitalsignage.R
 import app.tek4tv.digitalsignage.media.PlayerManager
@@ -66,7 +67,7 @@ class MainActivity : AppCompatActivity()
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         // TODO : add crash handler to app when building for customer
-        //Thread.setDefaultUncaughtExceptionHandler(CrashHandler(this))
+        Thread.setDefaultUncaughtExceptionHandler(CrashHandler(this))
 
         preference = getPreferences(MODE_PRIVATE)
         requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
