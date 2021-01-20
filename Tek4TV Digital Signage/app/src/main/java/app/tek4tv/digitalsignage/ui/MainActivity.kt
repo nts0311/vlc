@@ -7,16 +7,14 @@ import android.content.pm.PackageManager
 import android.media.AudioManager
 import android.os.Bundle
 import android.util.Log
-import android.view.View
-import android.widget.FrameLayout
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
-import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.content.edit
 import androidx.lifecycle.lifecycleScope
 import app.tek4tv.digitalsignage.CrashHandler
 import app.tek4tv.digitalsignage.HubManager
 import app.tek4tv.digitalsignage.R
+import app.tek4tv.digitalsignage.SerialPort
 import app.tek4tv.digitalsignage.media.PlayerManager
 import app.tek4tv.digitalsignage.model.*
 import app.tek4tv.digitalsignage.utils.*
@@ -26,6 +24,8 @@ import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.*
 import org.videolan.libvlc.*
 import org.videolan.libvlc.util.VLCVideoLayout
+import java.io.*
+import java.text.SimpleDateFormat
 import java.util.*
 import javax.inject.Inject
 
@@ -38,13 +38,13 @@ class MainActivity : AppCompatActivity()
     private val PREF_ORIENTATION = "pref_orientation"
 
     private val permissions = arrayOf(
-            Manifest.permission.WRITE_EXTERNAL_STORAGE,
-            Manifest.permission.READ_EXTERNAL_STORAGE,
-            Manifest.permission.REQUEST_INSTALL_PACKAGES,
-            Manifest.permission.INTERNET,
-            Manifest.permission.ACCESS_NETWORK_STATE,
-            Manifest.permission.READ_PHONE_STATE,
-            Manifest.permission.WRITE_SETTINGS
+        Manifest.permission.WRITE_EXTERNAL_STORAGE,
+        Manifest.permission.READ_EXTERNAL_STORAGE,
+        Manifest.permission.REQUEST_INSTALL_PACKAGES,
+        Manifest.permission.INTERNET,
+        Manifest.permission.ACCESS_NETWORK_STATE,
+        Manifest.permission.READ_PHONE_STATE,
+        Manifest.permission.WRITE_SETTINGS
     )
 
     private lateinit var mVideoLayout: VLCVideoLayout
@@ -59,11 +59,12 @@ class MainActivity : AppCompatActivity()
     private lateinit var audioManager: AudioManager
 
     private lateinit var preference: SharedPreferences
-    var d = 0.0f
-    var i = 0
 
-    override fun onCreate(savedInstanceState: Bundle?)
-    {
+    private var serialPort: SerialPort? = null
+    private var inputStream: InputStream? = null
+    private var outputStream: OutputStream? = null
+
+    override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         // TODO : add crash handler to app when building for customer
@@ -88,11 +89,15 @@ class MainActivity : AppCompatActivity()
         hubManager = HubManager(lifecycleScope, this, viewModel, moshi) { command, message ->
             handleFromCommandServer(command, message)
         }
-
-
-
         initHubConnect()
         registerObservers()
+
+        try {
+            initSerialPort()
+            readDevice()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 
     override fun onStop()
@@ -115,22 +120,19 @@ class MainActivity : AppCompatActivity()
     }
 
     override fun onRequestPermissionsResult(
-            requestCode: Int,
-            permissions: Array<out String>,
-            grantResults: IntArray
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
     )
     {
         when (requestCode)
         {
-            UPDATE_PERMISSION_REQUEST_CODE ->
-            {
+            UPDATE_PERMISSION_REQUEST_CODE -> {
                 // If request is cancelled, the result arrays are empty.
                 if (grantResults.size > 0
-                        && grantResults[0] == PackageManager.PERMISSION_GRANTED
-                )
-                {
-                } else
-                {
+                    && grantResults[0] == PackageManager.PERMISSION_GRANTED
+                ) {
+                } else {
                 }
             }
         }
@@ -235,118 +237,94 @@ class MainActivity : AppCompatActivity()
             {
                 when (command)
                 {
-                    Status.GET_LIST ->
-                    {
+                    Status.GET_LIST -> {
                     }
-                    Status.UPDATE_LIST ->
-                    {
+                    Status.UPDATE_LIST -> {
                         viewModel.playlistIndex = 0
                         viewModel.getPlaylist(applicationContext, true)
                     }
-                    Status.NEXT ->
-                    {
+                    Status.NEXT -> {
                     }
-                    Status.PREVIEW ->
-                    {
+                    Status.PREVIEW -> {
                     }
-                    Status.JUMP ->
-                    {
+                    Status.JUMP -> {
                         Log.d(command, message)
                         val id = responseHub.message!!.trim().toInt()
                         playMediaItemByIndex(id)
                     }
-                    Status.LIVE ->
-                    {
+                    Status.LIVE -> {
                         /*volume = reponseHub.getVolume()
                         playURLVideo(reponseHub.getMessage().trim(), false)*/
                     }
-                    Status.UPDATE_STATUS -> hubManager.pingHub(true)
-                    Status.GET_LOCATION ->
-                    {
+                    Status.UPDATE_STATUS -> {
+                        //hubManager.pingHub(true)
+
+                        writeToDevice(buildReadMessage(Define.FUNC_WRITE_READ_STATUS_PARAM, ""));
                     }
-                    Status.SET_VOLUME ->
-                    {
+                    Status.GET_LOCATION -> {
                     }
-                    Status.STOP ->
-                    {
+                    Status.SET_VOLUME -> {
                     }
-                    Status.PAUSE ->
-                    {
+                    Status.STOP -> {
                     }
-                    Status.START ->
-                    {
+                    Status.PAUSE -> {
                     }
-                    Status.RESTART ->
-                    {
+                    Status.START -> {
                     }
-                    Status.RELOAD ->
-                    {
+                    Status.RESTART -> {
+                    }
+                    Status.RELOAD -> {
 
                     }
-                    Status.SWITCH_MODE_FM ->
-                    {
+                    Status.SWITCH_MODE_FM -> {
                     }
-                    Status.SET_MUTE_DEVICE ->
-                    {
+                    Status.SET_MUTE_DEVICE -> {
                         if (responseHub.message != null)
                             setMute(responseHub.message!!)
                     }
-                    Status.SET_VOLUME_DEVICE ->
-                    {
+                    Status.SET_VOLUME_DEVICE -> {
                         if (responseHub.message != null)
                             setVolume(responseHub.message!!)
                     }
-                    Status.GET_VOLUME_DEVICE ->
-                    {
+                    Status.GET_VOLUME_DEVICE -> {
                     }
-                    Status.GET_SOURCE_AUDIO ->
-                    {
+                    Status.GET_SOURCE_AUDIO -> {
                     }
                     /*Status.GET_PA -> {
                         deviceAdrress = Define.Power_Amplifier_R
                         writeToDevice(buildReadMessageNew(Define.FUNC_WRITE_READ_DEVICE_INFO, "6"))
                     }*/
-                    Status.GET_FM_FQ ->
-                    {
+                    Status.GET_FM_FQ -> {
                     }
-                    Status.GET_AM_FQ ->
-                    {
+                    Status.GET_AM_FQ -> {
                     }
-                    Status.GET_TEMPERATURE ->
-                    {
+                    Status.GET_TEMPERATURE -> {
                     }
 
-                    Status.UPDATE_VERSION ->
-                    {
-                        if (responseHub.message != null)
-                        {
+                    Status.UPDATE_VERSION -> {
+                        if (responseHub.message != null) {
                             Log.d("update", responseHub.message!!)
                             downloadUpdateApk(responseHub.message!!, this)
                         }
                     }
 
-                    Status.UPDATE_MUSIC ->
-                    {
-                        if (responseHub.message != null)
-                        {
+                    Status.UPDATE_MUSIC -> {
+                        if (responseHub.message != null) {
                             Log.d("Update Music", responseHub.message!!)
                             viewModel.getAudioListFromNetwork(
-                                    applicationContext,
-                                    responseHub.message!!
+                                applicationContext,
+                                responseHub.message!!
                             )
 
                             playerManager.audioList = viewModel.getAudioList(applicationContext)
                         }
                     }
-                    Status.ROTATION ->
-                    {
+                    Status.ROTATION -> {
 
 
-                        if (responseHub.message != null)
-                        {
+                        if (responseHub.message != null) {
                             Log.d("rotation", responseHub.message.toString())
-                            try
-                            {
+                            try {
                                 val requireOrientation = responseHub.message!!.toInt()
                                 preference.edit {
                                     putInt(PREF_ORIENTATION, requireOrientation)
@@ -355,8 +333,7 @@ class MainActivity : AppCompatActivity()
                                 playerManager.switchViewOrientation(requireOrientation)
 
                                 //setScreenOrientation(getOrientation(requireOrientation))
-                            } catch (e: Exception)
-                            {
+                            } catch (e: Exception) {
                                 Log.e("orientation", "Error parsing orientation")
                             }
                         }
@@ -378,9 +355,9 @@ class MainActivity : AppCompatActivity()
         else AudioManager.ADJUST_UNMUTE
 
         audioManager.adjustStreamVolume(
-                AudioManager.STREAM_MUSIC,
-                direction,
-                AudioManager.FLAG_SHOW_UI
+            AudioManager.STREAM_MUSIC,
+            direction,
+            AudioManager.FLAG_SHOW_UI
         )
     }
 
@@ -392,44 +369,144 @@ class MainActivity : AppCompatActivity()
         try
         {
             volume = ((maxVolume.toFloat() / 100) * message.toInt()).toInt()
-        } catch (e: NumberFormatException)
-        {
+        } catch (e: NumberFormatException) {
 
         }
 
         audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, volume, AudioManager.FLAG_SHOW_UI)
     }
 
-    fun getOrientation(requestOri: Int): Int
-    {
-        return when (requestOri)
-        {
-            1 -> ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
-            2 -> ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
-            3 -> ActivityInfo.SCREEN_ORIENTATION_REVERSE_PORTRAIT
-            4 -> ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE
-            else -> ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+    private val UART_NAME = "/dev/ttyS4"
+
+    @Throws(IOException::class)
+    private fun initSerialPort() {
+        serialPort = SerialPort(File(UART_NAME), 9600, 0)
+        inputStream = serialPort!!.getInputStream()
+        outputStream = serialPort!!.getOutputStream()
+        if (serialPort != null && inputStream != null && outputStream != null) {
+            lifecycleScope.launch {
+                while (true) {
+                    onWatchDog()
+                    delay(3000)
+                }
+            }
         }
     }
 
-    fun testOrientation()
-    {
-        val mParentLayout = findViewById(R.id.video_layout) as View
-        mParentLayout.rotation = d
-        val lp = ConstraintLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
-        mParentLayout.layoutParams = lp
+    private fun onWatchDog() {
 
 
-        /* val displayMetrics = DisplayMetrics()
-         getWindowManager().getDefaultDisplay().getMetrics(displayMetrics)
+        val looseHubConnection = if (hubManager.lastPing != "") {
+            val dateformat = SimpleDateFormat("dd/MM/yyyy HH:mm:ss")
+            val now = Calendar.getInstance()
+            val lastPingTime = Calendar.getInstance().apply {
+                time = dateformat.parse(hubManager.lastPing)
+            }
+            now.timeInMillis - lastPingTime.timeInMillis > 45000
+        } else false
 
-         val height = displayMetrics.heightPixels
-         val width = displayMetrics.widthPixels
-         val offset = (width - height) / 2
-         val lp = FrameLayout.LayoutParams(height, width)
-         mParentLayout.layoutParams = lp
-         mParentLayout.rotation = 180.0f
-         mParentLayout.translationX = offset.toFloat()
-         mParentLayout.translationY = -offset.toFloat()*/
+
+        if (outputStream != null) {
+            //0: not internet, 1: ok , 2: internet, disconnected
+            //$$,1,2,0: normal(1: be restarted neet to jump to realtime)
+            //$$,1,8,1,910,675,5,0,0,1,0,28: 1: fm/am, fm freq, am freq, vol, audio source, pa, mute/unmute, external mic, tempareture
+            //$$,1,9,software version, device versionnải
+            try {
+
+                val onAir: Boolean = NetworkUtils.isNetworkConnected(this)
+                var param = if (onAir) "1" else "0"
+                Log.d("hub api", looseHubConnection.toString())
+                if (onAir) {
+                    if (looseHubConnection) {
+                        param = "2"
+                    }
+                }
+                param = "$param,${Utils.getMacAddr()}"
+                val mes: String = buildWriteMessage(Define.FUNC_WRITE_WATCH_DOG, param)
+
+                outputStream!!.write(mes.toByteArray())
+            } catch (e: IOException) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+
+    private var isRead = false
+    private fun buildWriteMessage(funtionId: String, data: String): String {
+        val s = "$$,$funtionId,$data,\r\n"
+        Log.d("requestdevice", s)
+        return s
+    }
+
+    private fun buildReadMessage(functionId: String, message: String): String {
+        isRead = true
+        val s = "$$,$functionId,$message,\r\n"
+        Log.d("requestevice", s)
+        return s
+    }
+
+
+    var dataFinal = StringBuffer()
+
+
+    private fun readDevice() {
+        lifecycleScope.launch {
+
+            withContext(Dispatchers.IO)
+            {
+                while (!Thread.currentThread().isInterrupted) {
+                    var size: Int
+                    try {
+                        val buffer = ByteArray(64)
+                        if (inputStream == null) return@withContext
+                        val a = inputStream!!.available()
+                        Log.d("aaa", a.toString())
+
+                        size = inputStream!!.read(buffer)
+
+                        if (size > 0) {
+                            val data = String(buffer, 0, size)
+                            dataFinal.append(data)
+                            if (dataFinal.toString().endsWith("\r\n")) {
+                                val s: String = dataFinal.toString()
+                                onDataReceived(s)
+                                dataFinal = StringBuffer()
+                            }
+                        }
+                    } catch (e: IOException) {
+                        e.printStackTrace()
+                        return@withContext
+                    }
+                }
+            }
+
+
+        }
+    }
+
+
+    private fun onDataReceived(data: String?) {
+        // read data
+        Log.d("OnDataReceived", "dataFinal: $data")
+        if (data!!.endsWith("\r\n")) {
+            if (data != null && !data.isEmpty() && data.startsWith("$$,")) {
+                if (isRead) {
+                    Log.d("OnDataReceived", data)
+                    isRead = false
+                }
+            }
+        }
+    }
+
+    private fun writeToDevice(message: String) {
+        if (outputStream != null) {
+            try {
+                outputStream!!.write(message.toByteArray())
+            } catch (e: java.lang.Exception) {
+                e.printStackTrace()
+            }
+        }
     }
 }
+

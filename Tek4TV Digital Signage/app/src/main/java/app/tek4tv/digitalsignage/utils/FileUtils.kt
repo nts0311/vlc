@@ -62,3 +62,21 @@ fun getAllFileNameInFolder(storagePath: String): List<String> {
         .map { it.name }
 }
 
+fun getFolderSize(path: String): Long {
+    val folder = File(path)
+
+    return try {
+        var size = 0L
+
+        for (f in folder.listFiles()) {
+            if (f.isFile)
+                size += f.length()
+
+        }
+
+        size
+    } catch (e: Exception) {
+        -1L
+    }
+}
+
