@@ -1,11 +1,10 @@
 package app.tek4tv.digitalsignage.utils
 
+import android.app.ActivityManager
 import android.content.Context
-import android.net.ConnectivityManager
+import android.content.Context.ACTIVITY_SERVICE
+import android.net.*
 import android.net.ConnectivityManager.NetworkCallback
-import android.net.Network
-import android.net.NetworkCapabilities
-import android.net.NetworkRequest
 import android.os.Build
 import android.telephony.TelephonyManager
 import android.util.Log
@@ -138,7 +137,33 @@ class NetworkUtils private constructor() {
 
         fun getSimNumber(context: Context): String {
             val tm = context.getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
+            val number = tm.line1Number ?: "error geting number"
+            Log.d(
+                "number", number
+            )
             return tm.line1Number ?: ""
         }
+
+        fun networkUsage(context: Context): String {
+            val manager = context.getSystemService(ACTIVITY_SERVICE) as ActivityManager
+            val runningApps = manager.runningAppProcesses
+            for (runningApp in runningApps) {
+                val received = TrafficStats.getUidRxBytes(runningApp.uid)
+                val sent = TrafficStats.getUidTxBytes(runningApp.uid)
+                Log.d(
+                    "ok", String.format(
+                        Locale.getDefault(),
+                        "uid: %1d - name: %s: Sent = %1d, Rcvd = %1d",
+                        runningApp.uid,
+                        runningApp.processName,
+                        sent,
+                        received
+                    )
+                )
+                return "$received,$sent"
+            }
+            return ""
+        }
+
     }
 }

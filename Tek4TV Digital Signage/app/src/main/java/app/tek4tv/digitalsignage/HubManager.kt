@@ -17,13 +17,12 @@ import java.text.SimpleDateFormat
 import java.util.*
 
 class HubManager(
-        private var lifecycleScope: CoroutineScope,
-        private var mainActivity: Activity,
-        private var viewModel: MainViewmodel,
-        private val moshi: Moshi,
-        var onMessageListener: (command: String?, message: String?) -> Unit
-)
-{
+    private var lifecycleScope: CoroutineScope,
+    private var mainActivity: Activity,
+    private var viewModel: MainViewmodel,
+    private val moshi: Moshi,
+    var onMessageListener: (command: String?, message: String?) -> Unit
+) {
     private val LOG_TAG = "HubConnectionTask"
 
     private var pingHubJob: Job? = null
@@ -33,8 +32,7 @@ class HubManager(
 
     private var openNewConnectionJob: Job? = null
 
-    fun createNewHubConnection()
-    {
+    fun createNewHubConnection() {
         if (openNewConnectionJob != null && openNewConnectionJob!!.isActive)
             return
 
@@ -43,13 +41,11 @@ class HubManager(
         onMessage()
     }
 
-    private fun connectToHub()
-    {
+    private fun connectToHub() {
         openNewConnectionJob = lifecycleScope.launch {
             val connectionId = openConnection()
 
-            if (connectionId != null)
-            {
+            if (connectionId != null) {
                 Log.d("Connected", connectionId)
                 pingTimer()
             }
@@ -58,62 +54,65 @@ class HubManager(
         }
     }
 
-    private suspend fun openConnection(): String?
-    {
+    private suspend fun openConnection(): String? {
         //open connection on another thread
         return withContext(Dispatchers.Default)
         {
-            try
-            {
+            try {
                 hubConnection!!.start().blockingAwait()
                 hubConnection!!.connectionId
-            } catch (e: Exception)
-            {
+            } catch (e: Exception) {
                 Log.e(LOG_TAG, "error connecting tto hub")
                 null
             }
         }
     }
 
-    private fun onMessage()
-    {
+    private fun onMessage() {
         hubConnection?.on(
-                "ReceiveMessage",
-                { command: String?, message: String? ->
-                    mainActivity.runOnUiThread {
-                        Log.d("command", command ?: "")
-                        Log.d("message", message ?: "")
-                        onMessageListener.invoke(command, message)
-                        //handleFromCommandServer(command, message)
+            "ReceiveMessage",
+            { command: String?, message: String? ->
+                mainActivity.runOnUiThread {
+                    Log.d("command", command ?: "")
+                    Log.d("message", message ?: "")
+                    onMessageListener.invoke(command, message)
+                    //handleFromCommandServer(command, message)
 
-                        if (command != null && message != null && command == Status.PONG)
-                        {
-                            lastPing = message
-                            Log.d("last ping", lastPing)
-                        }
+                    if (command != null && message != null && command == Status.PONG) {
+                        lastPing = message
+                        Log.d("last ping", lastPing)
                     }
-                },
-                String::class.java,
-                String::class.java
+                }
+            },
+            String::class.java,
+            String::class.java
         )
     }
 
-    private fun sendMessage(mess: String, command: String)
-    {
-        try
-        {
-            hubConnection!!.invoke(command, Utils.getDeviceId(mainActivity.applicationContext), mess)
-        } catch (e: Exception)
-        {
+    fun sendMessage(mess: String, command: String) {
+        try {
+            hubConnection!!.invoke(
+                command,
+                Utils.getDeviceId(mainActivity.applicationContext),
+                mess
+            )
+        } catch (e: Exception) {
             Log.e(LOG_TAG, e.message)
             e.printStackTrace()
         }
     }
 
-    fun pingHub(isUpdate: Boolean)
-    {
-        try
-        {
+    fun sendDirectMessage(connectionId: String, command: String, message: String) {
+        try {
+            hubConnection!!.invoke(Utils.DIRECT_MESSAGE, connectionId, command, message)
+        } catch (e: Exception) {
+            Log.e(LOG_TAG, e.message)
+            e.printStackTrace()
+        }
+    }
+
+    fun pingHub(isUpdate: Boolean) {
+        try {
             /*if (!isUpdate) {
                 if (count_ping_hub > 1) {
                     if (hubConnection == null) {
@@ -123,8 +122,7 @@ class HubManager(
                     }
                 }
             }*/
-            if (!mainActivity.isFinishing && hubConnection != null)
-            {
+            if (!mainActivity.isFinishing && hubConnection != null) {
                 // send ping_hub || update_status
                 //  val date: String = simpleDateFormat.format(Date())
                 Log.d(LOG_TAG, "ping hub")
@@ -134,8 +132,7 @@ class HubManager(
 
                 var mode = "-1"
 
-                if (!viewModel.playlist.value.isNullOrEmpty())
-                {
+                if (!viewModel.playlist.value.isNullOrEmpty()) {
                     val path = viewModel.playlist.value!![i].path!!
                     mode = if (path.isNotEmpty() && !File(path).exists()) "1"
                     else "0"
@@ -160,36 +157,65 @@ class HubManager(
                 sendMessage(requestAdater.toJson(request), Utils.ping)
                 Log.d("request", requestAdater.toJson(request))
             }
-        } catch (e: java.lang.Exception)
-        {
+        } catch (e: java.lang.Exception) {
             e.printStackTrace()
 
         }
     }
 
-    private fun pingTimer()
-    {
+    fun getPingHubRequest(command: String, message: String = ""): String {
+        val i = viewModel.playlistIndex
+        var mode = "-1"
+
+        if (!viewModel.playlist.value.isNullOrEmpty()) {
+            val path = viewModel.playlist.value!![i].path!!
+            mode = if (path.isNotEmpty() && !File(path).exists()) "1"
+            else "0"
+        }
+
+        val video = Video("" + i, mode)
+
+        val videoAdapter = moshi.adapter(Video::class.java)
+
+        var request = PingHubRequest().apply {
+
+            if (command == Utils.ping) {
+                status = "START"
+                this.video = videoAdapter.toJson(video)
+                val dateformat = SimpleDateFormat("dd/MM/yyyy HH:mm:ss")
+                startTine = dateformat.format(Date())
+            }
+
+            imei = Utils.getDeviceId(mainActivity.applicationContext)
+            connectionId = (hubConnection!!.connectionId)
+            this.message = message
+        }
+
+
+        val requestAdapter = moshi.adapter(PingHubRequest::class.java)
+        val json = requestAdapter.toJson(request)
+        Log.d("request", json)
+        return json
+    }
+
+    private fun pingTimer() {
         pingHubJob?.cancel()
         pingHubJob = lifecycleScope.launch {
-            while (true)
-            {
+            while (true) {
                 pingHub(true)
                 Log.d("pingtimer", "ping")
                 delay(15000)
 
                 val dateformat = SimpleDateFormat("dd/MM/yyyy HH:mm:ss")
-                if (lastPing != "")
-                {
-                    try
-                    {
+                if (lastPing != "") {
+                    try {
 
                         val now = Calendar.getInstance()
                         val lastPingTime = Calendar.getInstance().apply {
                             time = dateformat.parse(lastPing)
                         }
 
-                        if (now.timeInMillis - lastPingTime.timeInMillis > 45000)
-                        {
+                        if (now.timeInMillis - lastPingTime.timeInMillis > 45000) {
                             Log.e(LOG_TAG, "Losed hub connection")
 
                             if (hubConnection != null)
@@ -197,8 +223,7 @@ class HubManager(
 
                             createNewHubConnection()
                         }
-                    } catch (e: Exception)
-                    {
+                    } catch (e: Exception) {
                         Log.e(LOG_TAG, e.message)
                         e.printStackTrace()
                     }

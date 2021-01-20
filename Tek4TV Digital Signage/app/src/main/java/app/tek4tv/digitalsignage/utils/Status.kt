@@ -28,4 +28,9 @@ object Status {
     const val UPDATE_MUSIC = "UPDATE_MUSIC"
     const val PONG = "PONG"
     const val ROTATION = "ROTATION"
+    const val SET_TIME_OVER = "SET_TIME_OVER"
+    const val SET_TIME_ON = "SET_TIME_ON"
+    const val GET_APP_VERSION = "GET_APP_VERSION"
+    const val DTMF_STATUS = "DTMF_STATUS"
+    const val NETWORK_INFO = "NETWORK_INFO"
 }

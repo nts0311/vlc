@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.os.Environment
 import androidx.core.content.ContextCompat
+import com.squareup.moshi.Moshi
 import java.net.NetworkInterface
 import java.util.*
 
@@ -11,6 +12,11 @@ class Utils {
     companion object {
         const val ping = "Ping"
         const val DEVICE_ID = "device_id"
+        const val APP_VERSION = "APP_VERSION"
+        const val NETWORK_INFO = "NETWORK_INFO"
+        const val DEVICE_LOCATION = "DEVICE_LOCATION"
+        const val DIRECT_MESSAGE = "DirectMessage"
+        const val DEVICE_INFO = "DEVICE_INFO"
 
         @SuppressLint("HardwareIds")
         fun getDeviceId(context: Context): String? {
@@ -55,6 +61,11 @@ class Utils {
             } else {
                 context.applicationContext.filesDir.absolutePath
             }
+        }
+
+        fun <T> toJsonString(moshi: Moshi, type: Class<T>, value: T): String {
+            val adapter = moshi.adapter(type)
+            return adapter.toJson(value)
         }
     }
 }

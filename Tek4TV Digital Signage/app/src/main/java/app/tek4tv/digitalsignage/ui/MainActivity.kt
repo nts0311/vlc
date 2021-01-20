@@ -4,11 +4,15 @@ import android.Manifest
 import android.content.SharedPreferences
 import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
+import android.location.Location
+import android.location.LocationListener
+import android.location.LocationManager
 import android.media.AudioManager
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.app.ActivityCompat
 import androidx.core.content.edit
 import androidx.lifecycle.lifecycleScope
 import app.tek4tv.digitalsignage.CrashHandler
@@ -31,8 +35,7 @@ import javax.inject.Inject
 
 
 @AndroidEntryPoint
-class MainActivity : AppCompatActivity()
-{
+class MainActivity : AppCompatActivity() {
 
     private val UPDATE_PERMISSION_REQUEST_CODE = 1
     private val PREF_ORIENTATION = "pref_orientation"
@@ -44,7 +47,11 @@ class MainActivity : AppCompatActivity()
         Manifest.permission.INTERNET,
         Manifest.permission.ACCESS_NETWORK_STATE,
         Manifest.permission.READ_PHONE_STATE,
-        Manifest.permission.WRITE_SETTINGS
+        Manifest.permission.READ_PHONE_NUMBERS,
+        Manifest.permission.READ_SMS,
+        Manifest.permission.WRITE_SETTINGS,
+        Manifest.permission.ACCESS_FINE_LOCATION,
+        Manifest.permission.ACCESS_COARSE_LOCATION,
     )
 
     private lateinit var mVideoLayout: VLCVideoLayout
@@ -63,6 +70,10 @@ class MainActivity : AppCompatActivity()
     private var serialPort: SerialPort? = null
     private var inputStream: InputStream? = null
     private var outputStream: OutputStream? = null
+    private var volume = "100"
+    private var version = "3.0.1"
+
+    private var receivedConnectionId = ""
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -92,6 +103,8 @@ class MainActivity : AppCompatActivity()
         initHubConnect()
         registerObservers()
 
+
+
         try {
             initSerialPort()
             readDevice()
@@ -100,20 +113,17 @@ class MainActivity : AppCompatActivity()
         }
     }
 
-    override fun onStop()
-    {
+    override fun onStop() {
         super.onStop()
         playerManager.onActivityStop()
     }
 
-    override fun onDestroy()
-    {
+    override fun onDestroy() {
         super.onDestroy()
         playerManager.onActivityDestroy()
     }
 
-    override fun onStart()
-    {
+    override fun onStart() {
         super.onStart()
         playerManager.attachVisualPlayerView()
         startPlayingMedia()
@@ -123,10 +133,8 @@ class MainActivity : AppCompatActivity()
         requestCode: Int,
         permissions: Array<out String>,
         grantResults: IntArray
-    )
-    {
-        when (requestCode)
-        {
+    ) {
+        when (requestCode) {
             UPDATE_PERMISSION_REQUEST_CODE -> {
                 // If request is cancelled, the result arrays are empty.
                 if (grantResults.size > 0
@@ -138,13 +146,11 @@ class MainActivity : AppCompatActivity()
         }
     }
 
-    private fun needGrantPermission(): Boolean
-    {
+    private fun needGrantPermission(): Boolean {
         var needGrantPermission = false
 
         permissions.forEach {
-            if (checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED)
-            {
+            if (checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED) {
                 needGrantPermission = true
                 return@forEach
             }
@@ -153,14 +159,12 @@ class MainActivity : AppCompatActivity()
         return needGrantPermission
     }
 
-    private fun requestAppPermission()
-    {
+    private fun requestAppPermission() {
         requestPermissions(permissions, UPDATE_PERMISSION_REQUEST_CODE)
     }
 
 
-    private fun registerObservers()
-    {
+    private fun registerObservers() {
         viewModel.playlist.observe(this)
         {
             playerManager.setPlaylistContent(it, viewModel.getAudioList(applicationContext))
@@ -176,67 +180,56 @@ class MainActivity : AppCompatActivity()
         }
     }
 
-    private fun startPlayingMedia()
-    {
+    private fun startPlayingMedia() {
         viewModel.getPlaylist(applicationContext, false)
         viewModel.checkPlaylist(applicationContext)
     }
 
 
-    private fun initHubConnect()
-    {
+    private fun initHubConnect() {
         NetworkUtils.instance.mNetworkLive.observe(this)
         { isConnected ->
-            if (isConnected)
-            {
+            if (isConnected) {
 
                 if (!viewModel.isPlaying)
                     startPlayingMedia()
 
-                if (hubManager.hubConnection == null)
-                {
+                if (hubManager.hubConnection == null) {
                     hubManager.createNewHubConnection()
                     Log.d("Connected", "Connected")
                 }
-            } else
-            {
+
+                getLocation()
+            } else {
                 hubManager.hubConnection = null
             }
 
         }
     }
 
-    private fun playMediaItemByIndex(index: Int)
-    {
+    private fun playMediaItemByIndex(index: Int) {
         viewModel.playlistIndex = index
         playerManager.playMediaByIndex(viewModel.playlistIndex)
     }
 
-    private fun handleFromCommandServer(command: String?, message: String?)
-    {
-        try
-        {
-            if (command == null || command.isEmpty())
-            {
+    private fun handleFromCommandServer(command: String?, message: String?) {
+        try {
+            if (command == null || command.isEmpty()) {
                 return
             }
-            if (message == null || message.isEmpty())
-            {
+            if (message == null || message.isEmpty()) {
                 return
             }
             //count_ping_hub = 0
             var responseHub = ReponseHub()
-            if (message.startsWith("{"))
-            {
+            if (message.startsWith("{")) {
                 val jsonAdapter = moshi.adapter(ReponseHub::class.java)
                 responseHub = jsonAdapter.fromJson(message)!!
             }
 
             val isImei = Utils.getDeviceId(applicationContext) == responseHub.imei
-            if (isImei)
-            {
-                when (command)
-                {
+            if (isImei) {
+                when (command) {
                     Status.GET_LIST -> {
                     }
                     Status.UPDATE_LIST -> {
@@ -253,15 +246,43 @@ class MainActivity : AppCompatActivity()
                         playMediaItemByIndex(id)
                     }
                     Status.LIVE -> {
-                        /*volume = reponseHub.getVolume()
-                        playURLVideo(reponseHub.getMessage().trim(), false)*/
+
                     }
                     Status.UPDATE_STATUS -> {
-                        //hubManager.pingHub(true)
-
-                        writeToDevice(buildReadMessage(Define.FUNC_WRITE_READ_STATUS_PARAM, ""));
+                        writeToDevice(buildReadMessage(Define.FUNC_WRITE_READ_STATUS_PARAM, ""))
+                        receivedConnectionId = responseHub.message!!
                     }
                     Status.GET_LOCATION -> {
+                        if (mlocation != null) {
+                            val connectionId = responseHub.message
+                            val result = "${mlocation!!.latitude},${mlocation!!.longitude}"
+                            Log.d("location", connectionId)
+
+                            val receiveMessage =
+                                ReceiveMessage(Utils.getDeviceId(applicationContext)!!, result)
+
+
+                            hubManager.sendDirectMessage(
+                                connectionId!!,
+                                Utils.DEVICE_LOCATION,
+                                Utils.toJsonString(
+                                    moshi,
+                                    ReceiveMessage::class.java,
+                                    receiveMessage
+                                )
+                            )
+
+                            Log.d(
+                                "directmess",
+                                Utils.toJsonString(
+                                    moshi,
+                                    ReceiveMessage::class.java,
+                                    receiveMessage
+                                )
+                            )
+
+                        } else
+                            Log.d("location", "location not found")
                     }
                     Status.SET_VOLUME -> {
                     }
@@ -272,6 +293,7 @@ class MainActivity : AppCompatActivity()
                     Status.START -> {
                     }
                     Status.RESTART -> {
+                        writeToDevice(buildReadMessage(Define.FUNC_WRITE_RESTART_DEVICE, ""))
                     }
                     Status.RELOAD -> {
 
@@ -279,26 +301,20 @@ class MainActivity : AppCompatActivity()
                     Status.SWITCH_MODE_FM -> {
                     }
                     Status.SET_MUTE_DEVICE -> {
-                        if (responseHub.message != null)
-                            setMute(responseHub.message!!)
+                        writeToDevice(
+                            buildWriteMessage(
+                                Define.FUNC_WRITE_FORCE_SET_MUTE,
+                                responseHub.message ?: ""
+                            )
+                        )
                     }
                     Status.SET_VOLUME_DEVICE -> {
-                        if (responseHub.message != null)
-                            setVolume(responseHub.message!!)
-                    }
-                    Status.GET_VOLUME_DEVICE -> {
-                    }
-                    Status.GET_SOURCE_AUDIO -> {
-                    }
-                    /*Status.GET_PA -> {
-                        deviceAdrress = Define.Power_Amplifier_R
-                        writeToDevice(buildReadMessageNew(Define.FUNC_WRITE_READ_DEVICE_INFO, "6"))
-                    }*/
-                    Status.GET_FM_FQ -> {
-                    }
-                    Status.GET_AM_FQ -> {
-                    }
-                    Status.GET_TEMPERATURE -> {
+                        writeToDevice(
+                            buildWriteMessage(
+                                Define.FUNC_WRITE_FORCE_SET_VOLUME,
+                                responseHub.message ?: ""
+                            )
+                        )
                     }
 
                     Status.UPDATE_VERSION -> {
@@ -329,28 +345,68 @@ class MainActivity : AppCompatActivity()
                                 preference.edit {
                                     putInt(PREF_ORIENTATION, requireOrientation)
                                 }
-
                                 playerManager.switchViewOrientation(requireOrientation)
-
-                                //setScreenOrientation(getOrientation(requireOrientation))
                             } catch (e: Exception) {
                                 Log.e("orientation", "Error parsing orientation")
                             }
                         }
+                    }
 
+                    Status.SET_TIME_OVER -> {
+                        writeToDevice(buildReadMessage(Define.FUNC_WRITE_PLAY_NO_SOURCE, ""));
+                    }
+
+                    Status.SET_TIME_ON -> {
+                        writeToDevice(buildReadMessage(Define.FUNC_WRITE_PLAY_VOD_LIVE, volume))
+                    }
+
+                    Status.GET_APP_VERSION -> {
+                        hubManager.sendMessage(version, Utils.APP_VERSION)
                     }
 
 
+                    Status.DTMF_STATUS -> {
+                        //0: ON, 1:
+                        writeToDevice(
+                            buildWriteMessage(
+                                Define.FUNC_WRITE_DTMF,
+                                responseHub.message ?: ""
+                            )
+                        )
+                    }
+
+                    Status.NETWORK_INFO -> {
+
+                        val connectionId = responseHub.message
+
+                        val networkClass = NetworkUtils.getNetworkClass(applicationContext)
+                        val dataUsage = NetworkUtils.networkUsage(applicationContext)
+
+                        val result = "$networkClass,$dataUsage"
+
+                        val receiveMessage =
+                            ReceiveMessage(Utils.getDeviceId(applicationContext)!!, result)
+
+
+                        hubManager.sendDirectMessage(
+                            connectionId!!,
+                            Utils.NETWORK_INFO,
+                            Utils.toJsonString(moshi, ReceiveMessage::class.java, receiveMessage)
+                        )
+
+                        Log.d(
+                            "directmess",
+                            Utils.toJsonString(moshi, ReceiveMessage::class.java, receiveMessage)
+                        )
+                    }
                 }
             }
-        } catch (e: java.lang.Exception)
-        {
+        } catch (e: java.lang.Exception) {
             e.printStackTrace()
         }
     }
 
-    private fun setMute(mute: String)
-    {
+    private fun setMute(mute: String) {
         val direction = if (mute == "1") AudioManager.ADJUST_MUTE
         else AudioManager.ADJUST_UNMUTE
 
@@ -361,13 +417,11 @@ class MainActivity : AppCompatActivity()
         )
     }
 
-    private fun setVolume(message: String)
-    {
+    private fun setVolume(message: String) {
         var volume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
         var maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
 
-        try
-        {
+        try {
             volume = ((maxVolume.toFloat() / 100) * message.toInt()).toInt()
         } catch (e: NumberFormatException) {
 
@@ -375,6 +429,55 @@ class MainActivity : AppCompatActivity()
 
         audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, volume, AudioManager.FLAG_SHOW_UI)
     }
+
+    private var mlocation: Location? = null
+
+    private fun getLocation() {
+        try {
+            val locationManager =
+                this.getSystemService(LOCATION_SERVICE) as LocationManager
+            val locationListener: LocationListener = object : LocationListener {
+                override fun onLocationChanged(location: Location) {
+                    mlocation = location
+
+                    if (mlocation != null)
+                        Log.d(
+                            "location",
+                            "lat: ${mlocation!!.latitude}, long: ${mlocation!!.longitude}"
+                        )
+                }
+
+                override fun onStatusChanged(s: String, i: Int, bundle: Bundle) {}
+                override fun onProviderEnabled(s: String) {}
+                override fun onProviderDisabled(s: String) {}
+            }
+            if (ActivityCompat.checkSelfPermission(
+                    this,
+                    Manifest.permission.ACCESS_FINE_LOCATION
+                ) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(
+                    this,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
+                Log.d("location", "location permissions not granted")
+                return
+            }
+            locationManager.requestLocationUpdates(
+                LocationManager.GPS_PROVIDER,
+                100,
+                100f,
+                locationListener
+            )
+            locationManager.requestLocationUpdates(
+                LocationManager.NETWORK_PROVIDER,
+                100,
+                100f,
+                locationListener
+            )
+        } catch (ex: java.lang.Exception) {
+        }
+    }
+
 
     private val UART_NAME = "/dev/ttyS4"
 
@@ -407,6 +510,8 @@ class MainActivity : AppCompatActivity()
 
 
         if (outputStream != null) {
+
+            //$$,1,8,1,910,675,0,0,0,1,0,25
             //0: not internet, 1: ok , 2: internet, disconnected
             //$$,1,2,0: normal(1: be restarted neet to jump to realtime)
             //$$,1,8,1,910,675,5,0,0,1,0,28: 1: fm/am, fm freq, am freq, vol, audio source, pa, mute/unmute, external mic, tempareture
@@ -492,7 +597,14 @@ class MainActivity : AppCompatActivity()
         if (data!!.endsWith("\r\n")) {
             if (data != null && !data.isEmpty() && data.startsWith("$$,")) {
                 if (isRead) {
-                    Log.d("OnDataReceived", data)
+                    //Log.d("OnDataReceived", data)
+                    val receiveMessage =
+                        ReceiveMessage(Utils.getDeviceId(applicationContext)!!, data)
+                    hubManager.sendDirectMessage(
+                        receivedConnectionId,
+                        Utils.DEVICE_INFO,
+                        Utils.toJsonString(moshi, ReceiveMessage::class.java, receiveMessage)
+                    )
                     isRead = false
                 }
             }
