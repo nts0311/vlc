@@ -21,7 +21,6 @@ class PlaylistRepo @Inject constructor(
     moshi: Moshi,
     @ApplicationContext private val appContext: Context
 ) {
-    var playlist = listOf<MediaItem>()
 
     private val type = Types.newParameterizedType(List::class.java, MediaItem::class.java)
     private val jsonAdapter: JsonAdapter<List<MediaItem>> = moshi.adapter(type)
@@ -87,7 +86,6 @@ class PlaylistRepo @Inject constructor(
                 val resBody = res.body()
                 if (resBody != null && resBody.playlists != null) {
                     result = resBody.playlists!!
-                    playlist = result
                     savePlaylistToFile(result, storagePath)
                 }
             }

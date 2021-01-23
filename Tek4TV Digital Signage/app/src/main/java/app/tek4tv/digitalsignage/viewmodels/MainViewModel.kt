@@ -19,12 +19,12 @@ import kotlinx.coroutines.launch
 import java.io.File
 
 
-class MainViewmodel @ViewModelInject constructor(
-        private val playlistRepo: PlaylistRepo
+class MainViewModel @ViewModelInject constructor(
+    val playlistRepo: PlaylistRepo
 ) : ViewModel() {
 
     var isPlaying: Boolean = false
-    val playlist = MutableLiveData<List<MediaItem>>()
+    val broadcastList = MutableLiveData<List<MediaItem>>()
 
 
     private var getPlaylistJob: Job? = null
@@ -34,16 +34,18 @@ class MainViewmodel @ViewModelInject constructor(
 
     var playlistIndex = 0
 
+    var currentMediaItem: MediaItem? = null
+
 
     fun getPlaylist(context: Context, needUpdate: Boolean) {
         if (getPlaylistJob != null) return
 
         getPlaylistJob = viewModelScope.launch {
-            val broadcastList = playlistRepo.getBroadcastList(context.filesDir.path, needUpdate)
+            val res = playlistRepo.getBroadcastList(context.filesDir.path, needUpdate)
 
-            mediaDownloadManager.broadcastList = broadcastList
+            mediaDownloadManager.broadcastList = res
 
-            playlist.value = broadcastList
+            broadcastList.value = res
 
             getPlaylistJob = null
         }

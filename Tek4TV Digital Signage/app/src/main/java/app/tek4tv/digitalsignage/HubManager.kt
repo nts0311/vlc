@@ -7,7 +7,7 @@ import app.tek4tv.digitalsignage.model.Video
 import app.tek4tv.digitalsignage.utils.NetworkUtils
 import app.tek4tv.digitalsignage.utils.Status
 import app.tek4tv.digitalsignage.utils.Utils
-import app.tek4tv.digitalsignage.viewmodels.MainViewmodel
+import app.tek4tv.digitalsignage.viewmodels.MainViewModel
 import com.microsoft.signalr.HubConnection
 import com.microsoft.signalr.HubConnectionBuilder
 import com.squareup.moshi.Moshi
@@ -22,7 +22,7 @@ import java.util.*
 class HubManager(
     private var lifecycleScope: CoroutineScope,
     private var mainActivity: Activity,
-    private var viewModel: MainViewmodel,
+    private var viewModel: MainViewModel,
     private val moshi: Moshi,
     var onMessageListener: (command: String?, message: String?) -> Unit
 ) {
@@ -148,8 +148,8 @@ class HubManager(
 
                 var mode = "-1"
 
-                if (!viewModel.playlist.value.isNullOrEmpty()) {
-                    val path = viewModel.playlist.value!![i].path!!
+                if (viewModel.currentMediaItem != null) {
+                    val path = viewModel.currentMediaItem!!.path
                     mode = if (path.isNotEmpty() && !File(path).exists()) "1"
                     else "0"
                 }

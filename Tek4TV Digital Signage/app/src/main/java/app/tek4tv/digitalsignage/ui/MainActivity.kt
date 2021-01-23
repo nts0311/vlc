@@ -22,7 +22,7 @@ import app.tek4tv.digitalsignage.SerialPort
 import app.tek4tv.digitalsignage.media.PlayerManager
 import app.tek4tv.digitalsignage.model.*
 import app.tek4tv.digitalsignage.utils.*
-import app.tek4tv.digitalsignage.viewmodels.MainViewmodel
+import app.tek4tv.digitalsignage.viewmodels.MainViewModel
 import com.squareup.moshi.Moshi
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.*
@@ -56,7 +56,7 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var mVideoLayout: VLCVideoLayout
 
-    private val viewModel by viewModels<MainViewmodel>()
+    private val viewModel by viewModels<MainViewModel>()
 
     @Inject
     lateinit var moshi: Moshi
@@ -167,7 +167,7 @@ class MainActivity : AppCompatActivity() {
 
 
     private fun registerObservers() {
-        viewModel.playlist.observe(this)
+        viewModel.broadcastList.observe(this)
         {
             playerManager.setPlaylistContent(it, viewModel.getAudioList(applicationContext))
 
@@ -256,7 +256,7 @@ class MainActivity : AppCompatActivity() {
                             Log.d("location", connectionId)
 
                             val receiveMessage =
-                                ReceiveMessage(Utils.getDeviceId(applicationContext)!!, result)
+                                DirectMessage(Utils.getDeviceId(applicationContext)!!, result)
 
 
                             hubManager.sendDirectMessage(
@@ -264,7 +264,7 @@ class MainActivity : AppCompatActivity() {
                                 Utils.DEVICE_LOCATION,
                                 Utils.toJsonString(
                                     moshi,
-                                    ReceiveMessage::class.java,
+                                    DirectMessage::class.java,
                                     receiveMessage
                                 )
                             )
@@ -372,18 +372,18 @@ class MainActivity : AppCompatActivity() {
                         val result = "$networkClass,$dataUsage"
 
                         val receiveMessage =
-                            ReceiveMessage(Utils.getDeviceId(applicationContext)!!, result)
+                            DirectMessage(Utils.getDeviceId(applicationContext)!!, result)
 
 
                         hubManager.sendDirectMessage(
                             connectionId!!,
                             Utils.NETWORK_INFO,
-                            Utils.toJsonString(moshi, ReceiveMessage::class.java, receiveMessage)
+                            Utils.toJsonString(moshi, DirectMessage::class.java, receiveMessage)
                         )
 
                         Log.d(
                             "directmess",
-                            Utils.toJsonString(moshi, ReceiveMessage::class.java, receiveMessage)
+                            Utils.toJsonString(moshi, DirectMessage::class.java, receiveMessage)
                         )
                     }
                 }
@@ -586,11 +586,11 @@ class MainActivity : AppCompatActivity() {
                 if (isRead) {
                     //Log.d("OnDataReceived", data)
                     val receiveMessage =
-                        ReceiveMessage(Utils.getDeviceId(applicationContext)!!, data)
+                        DirectMessage(Utils.getDeviceId(applicationContext)!!, data)
                     hubManager.sendDirectMessage(
                         receivedConnectionId,
                         Utils.DEVICE_INFO,
-                        Utils.toJsonString(moshi, ReceiveMessage::class.java, receiveMessage)
+                        Utils.toJsonString(moshi, DirectMessage::class.java, receiveMessage)
                     )
                     isRead = false
                 }

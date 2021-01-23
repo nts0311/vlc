@@ -3,8 +3,7 @@ package app.tek4tv.digitalsignage
 import kotlinx.coroutines.*
 import java.util.*
 
-class Timer(private val lifecycleScope: CoroutineScope)
-{
+class Timer(private val coroutineScope: CoroutineScope) {
     private var tickJob: Job? = null
 
     private var timeListeners = mutableMapOf<Long, suspend (Long) -> Unit>()
@@ -20,9 +19,8 @@ class Timer(private val lifecycleScope: CoroutineScope)
 
     fun start()
     {
-        tickJob = lifecycleScope.launch {
-            while (true)
-            {
+        tickJob = coroutineScope.launch {
+            while (true) {
                 val now = Calendar.getInstance()
 
                 timeListeners.forEach { it.value.invoke(now.timeInMillis) }

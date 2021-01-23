@@ -2,7 +2,7 @@ package app.tek4tv.digitalsignage.model
 
 import com.squareup.moshi.Json
 
-data class ReceiveMessage(
+data class DirectMessage(
     @Json(name = "IMEI")
     var imei: String,
 

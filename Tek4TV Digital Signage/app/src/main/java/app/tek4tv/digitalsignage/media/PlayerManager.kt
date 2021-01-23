@@ -7,8 +7,9 @@ import app.tek4tv.digitalsignage.Timer
 import app.tek4tv.digitalsignage.model.MediaItem
 import app.tek4tv.digitalsignage.model.MediaType
 import app.tek4tv.digitalsignage.model.getDurationInSecond
+import app.tek4tv.digitalsignage.repo.PlaylistRepo
 import app.tek4tv.digitalsignage.ui.CustomPlayer
-import app.tek4tv.digitalsignage.viewmodels.MainViewmodel
+import app.tek4tv.digitalsignage.viewmodels.MainViewModel
 import kotlinx.coroutines.*
 import org.videolan.libvlc.LibVLC
 import org.videolan.libvlc.Media
@@ -19,36 +20,39 @@ import java.util.*
 class PlayerManager(
     private var applicationContext: Context,
     private var lifecycleScope: CoroutineScope,
-    private var viewModel: MainViewmodel,
+    private var viewModel: MainViewModel,
     var mVideoLayout: VLCVideoLayout
-)
-{
-    private val USE_TEXTURE_VIEW = true
-    private val ENABLE_SUBTITLES = true
+) {
     private var checkScheduledMediaJob: Job? = null
     private var presentImageJob: Job? = null
 
     private var timer: Timer
     private var checkScheduledMediaListenerId = -1L
 
-    val mLibVLC: LibVLC
-    val audioPlayer: CustomPlayer
-    val visualPlayer: CustomPlayer
+    private val mLibVLC: LibVLC
+    private val audioPlayer: CustomPlayer
+    private val visualPlayer: CustomPlayer
 
-    var mainPlayer: CustomPlayer? = null
-        set(value)
-        {
+    private var mainPlayer: CustomPlayer? = null
+        set(value) {
             field = value
             setMainPlayerEventListener()
         }
 
+
+    //rotation mode
+    var mode = 1
+
+    private val playlistRepo: PlaylistRepo
+        get() = viewModel.playlistRepo
+
     var currentPlaylist = listOf<MediaItem>()
     var audioList = listOf<Uri>()
 
-    var mode = 1
+    //-1 for random un scheduled media
+    private var currentPlaylistKey = "-1"
 
-    init
-    {
+    init {
         val args = ArrayList<String>()
         args.add("-vvv")
         args.add("--aout=opensles")
@@ -66,19 +70,16 @@ class PlayerManager(
         audioList = viewModel.getAudioList(applicationContext)
     }
 
-    fun attachVisualPlayerView()
-    {
-        if (mode == 0)
-        {
-            visualPlayer.attachViews(mVideoLayout, null, ENABLE_SUBTITLES, false)
+    fun attachVisualPlayerView() {
+        if (mode == 0) {
+            visualPlayer.attachViews(mVideoLayout, null, true, false)
         } else {
             mVideoLayout.rotation = 180.0f
-            visualPlayer.attachViews(mVideoLayout, null, ENABLE_SUBTITLES, true)
+            visualPlayer.attachViews(mVideoLayout, null, true, true)
         }
     }
 
-    fun switchViewOrientation(ori: Int)
-    {
+    fun switchViewOrientation(ori: Int) {
         visualPlayer.stop()
         visualPlayer.detachViews()
 
@@ -89,26 +90,15 @@ class PlayerManager(
         playMediaByIndex(0)
     }
 
-    fun setPlaylistContent(playlist: List<MediaItem>, audios: List<Uri>)
-    {
-        this.currentPlaylist = playlist
-        this.audioList = audios
-
-        viewModel.playlistIndex = 0
-
-        if (currentPlaylist.isNotEmpty())
-            playMediaByIndex(0)
-    }
-
-
-    fun playMediaByIndex(index: Int)
-    {
-        try
-        {
+    fun playMediaByIndex(index: Int) {
+        try {
             val playlist = currentPlaylist
 
             if (playlist.isEmpty()) return
             val mediaItem = playlist[index]
+
+            viewModel.currentMediaItem = mediaItem
+
             val media = mediaItem.getVlcMedia(mLibVLC)
 
             presentImageJob?.cancel()
@@ -117,63 +107,52 @@ class PlayerManager(
             visualPlayer.eventListener = {}
             audioPlayer.eventListener = {}
 
-            when (mediaItem.getMediaType())
-            {
-                MediaType.VIDEO ->
-                {
+            when (mediaItem.getMediaType()) {
+                MediaType.VIDEO -> {
                     Log.d("mediaplayed", "video")
 
-                    if (mediaItem.muted)
-                    {
+                    if (mediaItem.muted) {
                         mainPlayer = audioPlayer
                         playMutedVideo(mediaItem)
-                    } else
-                    {
+                    } else {
                         audioPlayer.stop()
                         media.addOption(":fullscreen")
                         mainPlayer = visualPlayer
                         visualPlayer.play(media)
                     }
                 }
-                MediaType.IMAGE ->
-                {
+                MediaType.IMAGE -> {
                     Log.d("mediaplayed", "audio")
                     presentImage(mediaItem)
                     mainPlayer = audioPlayer
                 }
-                else ->
-                {
+                else -> {
                 }
             }
 
 
-        } catch (e: Exception)
-        {
+        } catch (e: Exception) {
             Log.e("Main", e.message)
             e.printStackTrace()
         }
     }
 
-    private fun playMutedVideo(videoItem: MediaItem)
-    {
+    private fun playMutedVideo(videoItem: MediaItem) {
         val video = videoItem.getVlcMedia(mLibVLC)
         visualPlayer.media = video
         visualPlayer.play()
 
 
         visualPlayer.eventListener = { event ->
-            when (event)
-            {
-                MediaPlayer.Event.EndReached ->
-                {
-                    mVideoLayout!!.post {
+            when (event) {
+                MediaPlayer.Event.EndReached -> {
+                    mVideoLayout.post {
                         visualPlayer.media = video
                         visualPlayer.play()
                     }
                 }
 
-                MediaPlayer.Event.EncounteredError ->
-                {
+                MediaPlayer.Event.EncounteredError -> {
                     presentImageJob?.cancel()
                     presentImageJob = null
 
@@ -188,13 +167,11 @@ class PlayerManager(
     }
 
 
-    private fun presentImage(mediaItem: MediaItem)
-    {
+    private fun presentImage(mediaItem: MediaItem) {
 
         val imageList = mutableListOf(mediaItem)
 
-        if (!viewModel.playlist.value.isNullOrEmpty())
-            imageList.addAll(viewModel.playlist.value!!.filter { it.getMediaType() == MediaType.IMAGE })
+        imageList.addAll(playlistRepo.unscheduledList.filter { it.getMediaType() == MediaType.IMAGE })
 
         val delayDuration = 15000L
 
@@ -202,10 +179,8 @@ class PlayerManager(
 
         presentImageJob = lifecycleScope.launch {
             var playedMainImage = false
-            while (true)
-            {
-                val media = if (!playedMainImage)
-                {
+            while (true) {
+                val media = if (!playedMainImage) {
                     playedMainImage = true
                     mediaItem
                 } else imageList.random()
@@ -215,24 +190,21 @@ class PlayerManager(
         }
     }
 
-    private fun playRandomAudio()
-    {
+    private fun playRandomAudio() {
         if (audioList.isEmpty())
             audioList = viewModel.getAudioList(applicationContext)
 
-        if (audioList.isNotEmpty())
-        {
+        if (audioList.isNotEmpty()) {
             val backgroundAudio = Media(
-                    mLibVLC,
-                    audioList.random()
+                mLibVLC,
+                audioList.random()
             )
             audioPlayer.play(backgroundAudio)
         }
     }
 
 
-    private fun playNextMedia()
-    {
+    private fun playNextMedia() {
         mVideoLayout.post {
             val playlist = currentPlaylist
             viewModel.playlistIndex++
@@ -243,22 +215,17 @@ class PlayerManager(
         }
     }
 
-    private fun setMainPlayerEventListener()
-    {
-        if (mainPlayer != null)
-        {
+    private fun setMainPlayerEventListener() {
+        if (mainPlayer != null) {
             mainPlayer!!.eventListener = { event ->
-                when (event)
-                {
-                    MediaPlayer.Event.EndReached ->
-                    {
+                when (event) {
+                    MediaPlayer.Event.EndReached -> {
                         playNextMedia()
                         //remove callback
                         mainPlayer!!.eventListener = {}
                     }
 
-                    MediaPlayer.Event.EncounteredError ->
-                    {
+                    MediaPlayer.Event.EncounteredError -> {
                         presentImageJob?.cancel()
                         presentImageJob = null
 
@@ -272,17 +239,62 @@ class PlayerManager(
         }
     }
 
-    private fun checkScheduledMediaList()
-    {
-        checkScheduledMediaListenerId = timer.addTimeListener {
-            val currentTime = Calendar.getInstance()
+    fun onNewBroadcastList() {
+        checkScheduledMediaList()
+    }
 
+    private fun checkScheduledMediaList() {
+        timer.removeTimeListener(checkScheduledMediaListenerId)
+        val scheduledList = playlistRepo.scheduledList
+        checkScheduledMediaListenerId = timer.addTimeListener(Dispatchers.Default) { now ->
 
+            var foundPeriod = true
+
+            for (i in scheduledList.keys.indices) {
+                val period = scheduledList.keys.elementAt(i)
+
+                val t = period.split("-")
+
+                val start = toCalendar(t[0])
+                val end = toCalendar(t[1])
+
+                if (i == scheduledList.keys.size - 1)
+                    foundPeriod = false
+
+                if (now in start.timeInMillis..end.timeInMillis && currentPlaylistKey != period) {
+                    withContext(Dispatchers.Main)
+                    {
+                        setPlaylistContent(
+                            playlistRepo.scheduledList[period] ?: listOf(),
+                            audioList
+                        )
+                        currentPlaylistKey = period
+                    }
+
+                    foundPeriod = true
+
+                    break
+                }
+            }
+
+            if (!foundPeriod && currentPlaylistKey != "-1") {
+                setPlaylistContent(playlistRepo.unscheduledList, audioList)
+                currentPlaylistKey = "-1"
+            }
         }
     }
 
-    fun checkScheduledMedia()
-    {
+    fun setPlaylistContent(playlist: List<MediaItem>, audios: List<Uri>) {
+        this.currentPlaylist = playlist
+        this.audioList = audios
+
+        viewModel.playlistIndex = 0
+
+        if (currentPlaylist.isNotEmpty())
+            playMediaByIndex(0)
+    }
+
+    fun checkScheduledMedia() {
         checkScheduledMediaJob?.cancel()
 
         val playlist = currentPlaylist
@@ -290,8 +302,7 @@ class PlayerManager(
         scheduledItems.addAll(playlist.filter { it.fixTime.isNotEmpty() && it.fixTime != "00:00:00" })
 
         timer.addTimeListener(Dispatchers.Default) {
-            if (scheduledItems.isEmpty())
-            {
+            if (scheduledItems.isEmpty()) {
                 scheduledItems.addAll(playlist.filter { it.fixTime.isNotEmpty() && it.fixTime != "00:00:00" })
             }
 
@@ -299,39 +310,35 @@ class PlayerManager(
             var index = -1
 
             scheduledItems.forEachIndexed { i, mediaItem ->
-                try
-                {
-                    val time = mediaItem.fixTime.split(":").map { it.toInt() }
+                try {
+                    //val time = mediaItem.fixTime.split(":").map { it.toInt() }
 
                     val now = Calendar.getInstance()
 
-                    val scheduledTime = Calendar.getInstance().apply {
+                    val scheduledTime = toCalendar(mediaItem.fixTime) /*Calendar.getInstance().apply {
                         set(Calendar.HOUR_OF_DAY, time[0])
                         set(Calendar.MINUTE, time[1])
                         set(Calendar.SECOND, time[2])
-                    }
+                    }*/
 
                     val mediaDuration = getDurationInSecond(mediaItem.duration ?: "00:00:00")
 
                     if (scheduledTime.timeInMillis <= now.timeInMillis
-                            && now.timeInMillis <= scheduledTime.timeInMillis + mediaDuration * 1000
-                    )
-                    {
+                        && now.timeInMillis <= scheduledTime.timeInMillis + mediaDuration * 1000
+                    ) {
                         Log.d(
-                                "hengio",
-                                "${now.timeInMillis} - ${scheduledTime.timeInMillis} - ${scheduledTime.timeInMillis + mediaDuration * 1000}"
+                            "hengio",
+                            "${now.timeInMillis} - ${scheduledTime.timeInMillis} - ${scheduledTime.timeInMillis + mediaDuration * 1000}"
                         )
                         index = i
                     }
 
-                } catch (e: Exception)
-                {
+                } catch (e: Exception) {
                     Log.e("checkScheduledMedia", "error checking media fixtime")
                 }
             }
 
-            if (index != -1 && index < scheduledItems.size)
-            {
+            if (index != -1 && index < scheduledItems.size) {
                 withContext(Dispatchers.Main)
                 {
                     val indexToPlay = playlist.indexOf(scheduledItems[index])
@@ -413,8 +420,7 @@ class PlayerManager(
         }*/
     }
 
-    fun onActivityStop()
-    {
+    fun onActivityStop() {
         mainPlayer?.stop()
         audioPlayer.stop()
         visualPlayer.stop()
@@ -422,8 +428,7 @@ class PlayerManager(
         visualPlayer.detachViews()
     }
 
-    fun onActivityDestroy()
-    {
+    fun onActivityDestroy() {
         checkScheduledMediaJob?.cancel()
         presentImageJob?.cancel()
 

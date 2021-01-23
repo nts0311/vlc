@@ -71,7 +71,6 @@ fun getFolderSize(path: String): Long {
         for (f in folder.listFiles()) {
             if (f.isFile)
                 size += f.length()
-
         }
 
         size
