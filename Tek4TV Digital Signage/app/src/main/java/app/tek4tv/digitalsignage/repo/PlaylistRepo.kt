@@ -18,7 +18,7 @@ import javax.inject.Singleton
 @Singleton
 class PlaylistRepo @Inject constructor(
     private val playlistService: PlaylistService,
-    private val moshi: Moshi,
+    moshi: Moshi,
     @ApplicationContext private val appContext: Context
 ) {
     var playlist = listOf<MediaItem>()
@@ -30,9 +30,13 @@ class PlaylistRepo @Inject constructor(
         "IMEI" to Utils.getDeviceId(appContext)!!
     )
 
-    suspend fun getPlaylist(storagePath: String, needUpdate: Boolean): List<MediaItem> {
+    var broadcastList = listOf<MediaItem>()
+    var scheduledList = mutableMapOf<String, List<MediaItem>>()
+    var unscheduledList = mutableListOf<MediaItem>()
 
-        return if (needUpdate) {
+    suspend fun getBroadcastList(storagePath: String, needUpdate: Boolean): List<MediaItem> {
+
+        broadcastList = if (needUpdate) {
             updatePlaylist(storagePath)
         } else {
             val result = if (isFileExisted(storagePath, PLAYLIST_FILE_NAME)) {
@@ -42,6 +46,35 @@ class PlaylistRepo @Inject constructor(
                 updatePlaylist(storagePath)
             }
             result
+        }
+
+        filterMedia(broadcastList)
+
+        return broadcastList
+    }
+
+    private fun filterMedia(mediaList: List<MediaItem>) {
+        val dividerIndices = mediaList.indices.filter {
+            mediaList[it].path == "start" || mediaList[it].path == "end"
+        }.chunked(2)
+
+        val scheduledIndex = mutableListOf<Int>()
+
+        dividerIndices.forEach {
+            if (it.size == 2) {
+                val startIndex = it[0]
+                val endIndex = it[1]
+
+                val key = "${mediaList[startIndex].fixTime}-${mediaList[endIndex].fixTime}"
+                scheduledList[key] = mediaList.subList(startIndex + 1, endIndex)
+
+                //adding the index of scheduled media
+                scheduledIndex.addAll((startIndex..endIndex))
+            }
+        }
+
+        mediaList.indices.filter { !scheduledIndex.contains(it) }.forEach {
+            unscheduledList.add(mediaList[it])
         }
     }
 

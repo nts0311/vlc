@@ -1,6 +1,11 @@
 package app.tek4tv.digitalsignage
 
 import android.app.Activity
+import android.app.AlarmManager
+import android.app.PendingIntent
+import android.content.Context
+import android.content.Intent
+import app.tek4tv.digitalsignage.ui.MainActivity
 import java.io.BufferedWriter
 import java.io.File
 import java.io.FileWriter
@@ -16,25 +21,30 @@ class CrashHandler(private val activity: Activity) : Thread.UncaughtExceptionHan
         // TODO : add crash handler to app when building for customer
         if (appInstance != null) {
             logToFile(thread, ex)
-            /*val intent = Intent(activity, MainActivity::class.java)
-            intent.putExtra("crash", true)
-            intent.addFlags(
-                    Intent.FLAG_ACTIVITY_CLEAR_TOP
-                            or Intent.FLAG_ACTIVITY_CLEAR_TASK
-                            or Intent.FLAG_ACTIVITY_NEW_TASK
-            )
-            val pendingIntent = PendingIntent.getActivity(
-                    appInstance.getBaseContext(),
-                    0,
-                    intent,
-                    PendingIntent.FLAG_ONE_SHOT
-            )
-            val mgr = appInstance.getBaseContext()
-                    .getSystemService(Context.ALARM_SERVICE) as AlarmManager
-            mgr[AlarmManager.RTC, System.currentTimeMillis() + 100] = pendingIntent
-            activity.finish()
-            System.exit(2)*/
+
+            //restartApp(appInstance)
         }
+    }
+
+    private fun restartApp(appInstance: MyApp) {
+        val intent = Intent(activity, MainActivity::class.java)
+        intent.putExtra("crash", true)
+        intent.addFlags(
+            Intent.FLAG_ACTIVITY_CLEAR_TOP
+                    or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                    or Intent.FLAG_ACTIVITY_NEW_TASK
+        )
+        val pendingIntent = PendingIntent.getActivity(
+            appInstance.baseContext,
+            0,
+            intent,
+            PendingIntent.FLAG_ONE_SHOT
+        )
+        val mgr = appInstance.baseContext
+            .getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        mgr[AlarmManager.RTC, System.currentTimeMillis() + 100] = pendingIntent
+        activity.finish()
+        System.exit(2)
     }
 
     private fun logToFile(thread: Thread, ex: Throwable) {
@@ -60,7 +70,5 @@ class CrashHandler(private val activity: Activity) : Thread.UncaughtExceptionHan
         } catch (e: Exception) {
 
         }
-
-
     }
 }

@@ -1,12 +1,13 @@
 package app.tek4tv.digitalsignage.utils
 
+import android.annotation.SuppressLint
 import android.app.ActivityManager
 import android.content.Context
 import android.content.Context.ACTIVITY_SERVICE
 import android.net.*
 import android.net.ConnectivityManager.NetworkCallback
 import android.os.Build
-import android.telephony.TelephonyManager
+import android.telephony.*
 import android.util.Log
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.MutableLiveData
@@ -135,14 +136,14 @@ class NetworkUtils private constructor() {
             return "?"
         }
 
-        fun getSimNumber(context: Context): String {
-            val tm = context.getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
-            val number = tm.line1Number ?: "error geting number"
-            Log.d(
-                "number", number
-            )
-            return tm.line1Number ?: ""
-        }
+        /* fun getSimNumber(context: Context): String {
+             val tm = context.getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
+             val number = tm.line1Number ?: "error geting number"
+             Log.d(
+                 "number", number
+             )
+             return tm.line1Number ?: ""
+         }*/
 
         fun networkUsage(context: Context): String {
             val manager = context.getSystemService(ACTIVITY_SERVICE) as ActivityManager
@@ -165,5 +166,23 @@ class NetworkUtils private constructor() {
             return ""
         }
 
+        @SuppressLint("MissingPermission")
+        fun getCellSignalStrength(context: Context): Int {
+            val tm = context.getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
+
+            val cellInfo = tm.allCellInfo[0]
+
+            if (cellInfo != null) {
+                return when (cellInfo) {
+                    is CellInfoLte -> cellInfo.cellSignalStrength.level
+                    is CellInfoCdma -> cellInfo.cellSignalStrength.level
+                    is CellInfoGsm -> cellInfo.cellSignalStrength.level
+                    is CellInfoWcdma -> cellInfo.cellSignalStrength.level
+                    else -> CellSignalStrength.SIGNAL_STRENGTH_NONE_OR_UNKNOWN
+                }
+            }
+
+            return CellSignalStrength.SIGNAL_STRENGTH_NONE_OR_UNKNOWN
+        }
     }
 }

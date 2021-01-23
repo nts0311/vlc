@@ -17,10 +17,11 @@ import org.videolan.libvlc.util.VLCVideoLayout
 import java.util.*
 
 class PlayerManager(
-        private var applicationContext: Context,
-        private var lifecycleScope: CoroutineScope,
-        private var viewModel: MainViewmodel,
-        var mVideoLayout: VLCVideoLayout?)
+    private var applicationContext: Context,
+    private var lifecycleScope: CoroutineScope,
+    private var viewModel: MainViewmodel,
+    var mVideoLayout: VLCVideoLayout
+)
 {
     private val USE_TEXTURE_VIEW = true
     private val ENABLE_SUBTITLES = true
@@ -55,9 +56,6 @@ class PlayerManager(
         args.add("--network-caching=2000")
         args.add("--no-http-reconnect")
 
-        /*args.add("--file-logging")
-        args.add("--logfile=vlc-log.txt")*/
-
         timer = Timer(lifecycleScope)
         timer.start()
 
@@ -72,11 +70,10 @@ class PlayerManager(
     {
         if (mode == 0)
         {
-            visualPlayer.attachViews(mVideoLayout!!, null, ENABLE_SUBTITLES, false)
-        } else
-        {
-            mVideoLayout!!.rotation = 180.0f
-            visualPlayer.attachViews(mVideoLayout!!, null, ENABLE_SUBTITLES, true)
+            visualPlayer.attachViews(mVideoLayout, null, ENABLE_SUBTITLES, false)
+        } else {
+            mVideoLayout.rotation = 180.0f
+            visualPlayer.attachViews(mVideoLayout, null, ENABLE_SUBTITLES, true)
         }
     }
 
@@ -236,7 +233,7 @@ class PlayerManager(
 
     private fun playNextMedia()
     {
-        mVideoLayout!!.post {
+        mVideoLayout.post {
             val playlist = currentPlaylist
             viewModel.playlistIndex++
             if (viewModel.playlistIndex >= playlist.size)

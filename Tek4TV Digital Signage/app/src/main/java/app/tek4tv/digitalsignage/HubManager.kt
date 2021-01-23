@@ -12,7 +12,10 @@ import com.microsoft.signalr.HubConnection
 import com.microsoft.signalr.HubConnectionBuilder
 import com.squareup.moshi.Moshi
 import kotlinx.coroutines.*
+import java.io.BufferedWriter
 import java.io.File
+import java.io.FileWriter
+import java.io.PrintWriter
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -37,6 +40,7 @@ class HubManager(
             return
 
         hubConnection = HubConnectionBuilder.create(NetworkUtils.URL_HUB).build()
+
         connectToHub()
         onMessage()
     }
@@ -59,7 +63,29 @@ class HubManager(
         return withContext(Dispatchers.Default)
         {
             try {
-                hubConnection!!.start().blockingAwait()
+                hubConnection!!.start().doOnError {
+                    val logPath =
+                        "${mainActivity.applicationContext.filesDir.path}${File.separator}log.txt"
+                    val out = PrintWriter(BufferedWriter(FileWriter(logPath, true)))
+                    val df = SimpleDateFormat("yyyy.MM.dd 'at' HH:mm:ss")
+
+                    out.println("------------------------")
+                    out.println("From HubManager.openConnection()")
+
+                    out.println("${df.format(Calendar.getInstance().time)}\n")
+
+                    out.println("Thread name: ${Thread.currentThread().name}")
+                    out.println("Message: ${it.message}")
+                    out.println("Cause: ${it.cause}")
+                    out.println("Stack trace: ")
+                    it.printStackTrace(out)
+
+                    out.println("------------------------")
+
+
+                    out.close()
+                }
+                    .blockingAwait()
                 hubConnection!!.connectionId
             } catch (e: Exception) {
                 Log.e(LOG_TAG, "error connecting tto hub")
@@ -75,8 +101,9 @@ class HubManager(
                 mainActivity.runOnUiThread {
                     Log.d("command", command ?: "")
                     Log.d("message", message ?: "")
+
+                    //Handle command from server in MainActivity
                     onMessageListener.invoke(command, message)
-                    //handleFromCommandServer(command, message)
 
                     if (command != null && message != null && command == Status.PONG) {
                         lastPing = message
@@ -111,24 +138,13 @@ class HubManager(
         }
     }
 
-    fun pingHub(isUpdate: Boolean) {
+    fun pingHub() {
         try {
-            /*if (!isUpdate) {
-                if (count_ping_hub > 1) {
-                    if (hubConnection == null) {
-                        connectHub()
-                    } else {
-                        hubConnection!!.start()
-                    }
-                }
-            }*/
             if (!mainActivity.isFinishing && hubConnection != null) {
-                // send ping_hub || update_status
-                //  val date: String = simpleDateFormat.format(Date())
+
                 Log.d(LOG_TAG, "ping hub")
                 val i = viewModel.playlistIndex
                 Log.d("player:", i.toString())
-                //if (i >= 0 && i < mainViewModel.lstLiveData.getValue().size()) {
 
                 var mode = "-1"
 
@@ -150,12 +166,9 @@ class HubManager(
                     val dateformat = SimpleDateFormat("dd/MM/yyyy HH:mm:ss")
                     startTine = dateformat.format(Date())
                 }
-
-
-                //count_ping_hub = count_ping_hub + 1
-                val requestAdater = moshi.adapter(PingHubRequest::class.java)
-                sendMessage(requestAdater.toJson(request), Utils.ping)
-                Log.d("request", requestAdater.toJson(request))
+                val requestAdapter = moshi.adapter(PingHubRequest::class.java)
+                sendMessage(requestAdapter.toJson(request), Utils.ping)
+                Log.d("request", requestAdapter.toJson(request))
             }
         } catch (e: java.lang.Exception) {
             e.printStackTrace()
@@ -163,46 +176,11 @@ class HubManager(
         }
     }
 
-    fun getPingHubRequest(command: String, message: String = ""): String {
-        val i = viewModel.playlistIndex
-        var mode = "-1"
-
-        if (!viewModel.playlist.value.isNullOrEmpty()) {
-            val path = viewModel.playlist.value!![i].path!!
-            mode = if (path.isNotEmpty() && !File(path).exists()) "1"
-            else "0"
-        }
-
-        val video = Video("" + i, mode)
-
-        val videoAdapter = moshi.adapter(Video::class.java)
-
-        var request = PingHubRequest().apply {
-
-            if (command == Utils.ping) {
-                status = "START"
-                this.video = videoAdapter.toJson(video)
-                val dateformat = SimpleDateFormat("dd/MM/yyyy HH:mm:ss")
-                startTine = dateformat.format(Date())
-            }
-
-            imei = Utils.getDeviceId(mainActivity.applicationContext)
-            connectionId = (hubConnection!!.connectionId)
-            this.message = message
-        }
-
-
-        val requestAdapter = moshi.adapter(PingHubRequest::class.java)
-        val json = requestAdapter.toJson(request)
-        Log.d("request", json)
-        return json
-    }
-
     private fun pingTimer() {
         pingHubJob?.cancel()
         pingHubJob = lifecycleScope.launch {
             while (true) {
-                pingHub(true)
+                pingHub()
                 Log.d("pingtimer", "ping")
                 delay(15000)
 

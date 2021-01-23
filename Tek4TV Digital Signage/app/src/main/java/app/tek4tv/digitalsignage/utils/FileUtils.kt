@@ -37,8 +37,8 @@ suspend fun writeFile(filePath: String, content: String) {
 }
 
 @Throws(IOException::class)
-fun createFolder(storagePath: String, folderName: String): Boolean {
-    val folder = File("$storagePath${File.separator}$folderName")
+fun createFolder(storagePath: String): Boolean {
+    val folder = File(storagePath)
     var success = false
 
     if (!folder.exists()) {
@@ -49,8 +49,8 @@ fun createFolder(storagePath: String, folderName: String): Boolean {
 }
 
 @Throws(IOException::class)
-fun isFolderExisted(storagePath: String, folderName: String): Boolean {
-    val folder = File("$storagePath${File.separator}$folderName")
+fun isFolderExisted(storagePath: String): Boolean {
+    val folder = File(storagePath)
     return folder.exists() && folder.isDirectory
 }
 

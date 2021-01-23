@@ -78,7 +78,7 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
-        // TODO : add crash handler to app when building for customer
+
         Thread.setDefaultUncaughtExceptionHandler(CrashHandler(this))
 
         preference = getPreferences(MODE_PRIVATE)
@@ -111,6 +111,8 @@ class MainActivity : AppCompatActivity() {
         } catch (e: Exception) {
             e.printStackTrace()
         }
+
+        val a = NetworkUtils.getCellSignalStrength(applicationContext)
     }
 
     override fun onStop() {
@@ -172,11 +174,6 @@ class MainActivity : AppCompatActivity() {
             playerManager.checkScheduledMedia()
 
             viewModel.downloadMedias(applicationContext)
-
-
-            /*if (viewModel.playlist.value != null && viewModel.playlistIndex >= viewModel.playlist.value!!.size)
-                viewModel.playlistIndex = 0
-            playerManager.playMediaByIndex(viewModel.playlistIndex)*/
         }
     }
 
@@ -271,16 +268,6 @@ class MainActivity : AppCompatActivity() {
                                     receiveMessage
                                 )
                             )
-
-                            Log.d(
-                                "directmess",
-                                Utils.toJsonString(
-                                    moshi,
-                                    ReceiveMessage::class.java,
-                                    receiveMessage
-                                )
-                            )
-
                         } else
                             Log.d("location", "location not found")
                     }
