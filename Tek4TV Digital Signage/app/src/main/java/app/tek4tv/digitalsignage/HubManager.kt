@@ -12,10 +12,7 @@ import com.microsoft.signalr.HubConnection
 import com.microsoft.signalr.HubConnectionBuilder
 import com.squareup.moshi.Moshi
 import kotlinx.coroutines.*
-import java.io.BufferedWriter
 import java.io.File
-import java.io.FileWriter
-import java.io.PrintWriter
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -63,29 +60,7 @@ class HubManager(
         return withContext(Dispatchers.Default)
         {
             try {
-                hubConnection!!.start().doOnError {
-                    val logPath =
-                        "${mainActivity.applicationContext.filesDir.path}${File.separator}log.txt"
-                    val out = PrintWriter(BufferedWriter(FileWriter(logPath, true)))
-                    val df = SimpleDateFormat("yyyy.MM.dd 'at' HH:mm:ss")
-
-                    out.println("------------------------")
-                    out.println("From HubManager.openConnection()")
-
-                    out.println("${df.format(Calendar.getInstance().time)}\n")
-
-                    out.println("Thread name: ${Thread.currentThread().name}")
-                    out.println("Message: ${it.message}")
-                    out.println("Cause: ${it.cause}")
-                    out.println("Stack trace: ")
-                    it.printStackTrace(out)
-
-                    out.println("------------------------")
-
-
-                    out.close()
-                }
-                    .blockingAwait()
+                hubConnection!!.start().blockingAwait()
                 hubConnection!!.connectionId
             } catch (e: Exception) {
                 Log.e(LOG_TAG, "error connecting tto hub")

@@ -48,7 +48,6 @@ class PlaylistRepo @Inject constructor(
         }
 
         filterMedia(broadcastList)
-
         return broadcastList
     }
 

@@ -23,11 +23,12 @@ class PlayerManager(
     private var viewModel: MainViewModel,
     var mVideoLayout: VLCVideoLayout
 ) {
-    private var checkScheduledMediaJob: Job? = null
+    private var checkScheduledMediaJobId: Long = -1L
+
     private var presentImageJob: Job? = null
 
     private var timer: Timer
-    private var checkScheduledMediaListenerId = -1L
+    private var checkScheduledMediaListId = -1L
 
     private val mLibVLC: LibVLC
     private val audioPlayer: CustomPlayer
@@ -49,8 +50,10 @@ class PlayerManager(
     var currentPlaylist = listOf<MediaItem>()
     var audioList = listOf<Uri>()
 
-    //-1 for random un scheduled media
-    private var currentPlaylistKey = "-1"
+    //-1 for random unscheduled media
+    //0 for init
+    //HH:mm:ss-HH:mm:ss for scheduled media
+    private var currentPlaylistKey = "0"
 
     init {
         val args = ArrayList<String>()
@@ -185,6 +188,7 @@ class PlayerManager(
                     mediaItem
                 } else imageList.random()
                 visualPlayer.play(media.getVlcMedia(mLibVLC))
+                media.getVlcMedia(mLibVLC).release()
                 delay(delayDuration)
             }
         }
@@ -240,15 +244,16 @@ class PlayerManager(
     }
 
     fun onNewBroadcastList() {
+        currentPlaylistKey = "0"
         checkScheduledMediaList()
     }
 
     private fun checkScheduledMediaList() {
-        timer.removeTimeListener(checkScheduledMediaListenerId)
+        timer.removeTimeListener(checkScheduledMediaListId)
         val scheduledList = playlistRepo.scheduledList
-        checkScheduledMediaListenerId = timer.addTimeListener(Dispatchers.Default) { now ->
+        checkScheduledMediaListId = timer.addTimeListener(Dispatchers.Default) { now ->
 
-            var foundPeriod = true
+            var foundPeriod = false
 
             for (i in scheduledList.keys.indices) {
                 val period = scheduledList.keys.elementAt(i)
@@ -258,21 +263,20 @@ class PlayerManager(
                 val start = toCalendar(t[0])
                 val end = toCalendar(t[1])
 
-                if (i == scheduledList.keys.size - 1)
-                    foundPeriod = false
+                if (now in start.timeInMillis..end.timeInMillis) {
 
-                if (now in start.timeInMillis..end.timeInMillis && currentPlaylistKey != period) {
-                    withContext(Dispatchers.Main)
-                    {
-                        setPlaylistContent(
-                            playlistRepo.scheduledList[period] ?: listOf(),
-                            audioList
-                        )
-                        currentPlaylistKey = period
+                    if (currentPlaylistKey != period) {
+                        withContext(Dispatchers.Main)
+                        {
+                            setPlaylistContent(
+                                playlistRepo.scheduledList[period] ?: listOf(),
+                                audioList
+                            )
+                            currentPlaylistKey = period
+                        }
                     }
 
                     foundPeriod = true
-
                     break
                 }
             }
@@ -295,13 +299,13 @@ class PlayerManager(
     }
 
     fun checkScheduledMedia() {
-        checkScheduledMediaJob?.cancel()
+        timer.removeTimeListener(checkScheduledMediaJobId)
 
         val playlist = currentPlaylist
         val scheduledItems: MutableList<MediaItem> = mutableListOf()
         scheduledItems.addAll(playlist.filter { it.fixTime.isNotEmpty() && it.fixTime != "00:00:00" })
 
-        timer.addTimeListener(Dispatchers.Default) {
+        checkScheduledMediaJobId = timer.addTimeListener(Dispatchers.Default) {
             if (scheduledItems.isEmpty()) {
                 scheduledItems.addAll(playlist.filter { it.fixTime.isNotEmpty() && it.fixTime != "00:00:00" })
             }
@@ -311,15 +315,9 @@ class PlayerManager(
 
             scheduledItems.forEachIndexed { i, mediaItem ->
                 try {
-                    //val time = mediaItem.fixTime.split(":").map { it.toInt() }
-
                     val now = Calendar.getInstance()
 
-                    val scheduledTime = toCalendar(mediaItem.fixTime) /*Calendar.getInstance().apply {
-                        set(Calendar.HOUR_OF_DAY, time[0])
-                        set(Calendar.MINUTE, time[1])
-                        set(Calendar.SECOND, time[2])
-                    }*/
+                    val scheduledTime = toCalendar(mediaItem.fixTime)
 
                     val mediaDuration = getDurationInSecond(mediaItem.duration ?: "00:00:00")
 
@@ -429,7 +427,6 @@ class PlayerManager(
     }
 
     fun onActivityDestroy() {
-        checkScheduledMediaJob?.cancel()
         presentImageJob?.cancel()
 
         mainPlayer?.release()

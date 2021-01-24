@@ -104,13 +104,13 @@ class MainActivity : AppCompatActivity() {
         registerObservers()
 
 
-
-        try {
+        //TODO: enable this
+        /*try {
             initSerialPort()
             readDevice()
         } catch (e: Exception) {
             e.printStackTrace()
-        }
+        }*/
 
         val a = NetworkUtils.getCellSignalStrength(applicationContext)
     }
@@ -169,7 +169,9 @@ class MainActivity : AppCompatActivity() {
     private fun registerObservers() {
         viewModel.broadcastList.observe(this)
         {
-            playerManager.setPlaylistContent(it, viewModel.getAudioList(applicationContext))
+            playerManager.audioList = viewModel.getAudioList(applicationContext)
+            playerManager.onNewBroadcastList()
+            //playerManager.setPlaylistContent(it, viewModel.getAudioList(applicationContext))
 
             playerManager.checkScheduledMedia()
 
@@ -196,7 +198,7 @@ class MainActivity : AppCompatActivity() {
                     Log.d("Connected", "Connected")
                 }
 
-                getLocation()
+                //getLocation()
             } else {
                 hubManager.hubConnection = null
             }
