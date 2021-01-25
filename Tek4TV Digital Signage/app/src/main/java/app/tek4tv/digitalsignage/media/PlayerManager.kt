@@ -28,6 +28,7 @@ class PlayerManager(
     private var presentImageJob: Job? = null
 
     private var timer: Timer
+    private var checkScheduledListTimer: Timer
     private var checkScheduledMediaListId = -1L
 
     private val mLibVLC: LibVLC
@@ -42,7 +43,7 @@ class PlayerManager(
 
 
     //rotation mode
-    var mode = 1
+    var rotationMode = 0
 
     private val playlistRepo: PlaylistRepo
         get() = viewModel.playlistRepo
@@ -66,6 +67,10 @@ class PlayerManager(
         timer = Timer(lifecycleScope)
         timer.start()
 
+        checkScheduledListTimer = Timer(lifecycleScope)
+        checkScheduledListTimer.delay = 15000
+        checkScheduledListTimer.start()
+
         mLibVLC = LibVLC(applicationContext, args)
         visualPlayer = CustomPlayer(mLibVLC)
         audioPlayer = CustomPlayer(mLibVLC)
@@ -74,23 +79,12 @@ class PlayerManager(
     }
 
     fun attachVisualPlayerView() {
-        if (mode == 0) {
+        if (rotationMode == 0) {
             visualPlayer.attachViews(mVideoLayout, null, true, false)
         } else {
             mVideoLayout.rotation = 180.0f
             visualPlayer.attachViews(mVideoLayout, null, true, true)
         }
-    }
-
-    fun switchViewOrientation(ori: Int) {
-        visualPlayer.stop()
-        visualPlayer.detachViews()
-
-        mode = ori
-
-        attachVisualPlayerView()
-
-        playMediaByIndex(0)
     }
 
     fun playMediaByIndex(index: Int) {
@@ -102,6 +96,15 @@ class PlayerManager(
 
             viewModel.currentMediaItem = mediaItem
 
+            playMedia(mediaItem)
+
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    private fun playMedia(mediaItem: MediaItem) {
+        try {
             val media = mediaItem.getVlcMedia(mLibVLC)
 
             presentImageJob?.cancel()
@@ -135,7 +138,6 @@ class PlayerManager(
 
 
         } catch (e: Exception) {
-            Log.e("Main", e.message)
             e.printStackTrace()
         }
     }
@@ -195,16 +197,14 @@ class PlayerManager(
     }
 
     private fun playRandomAudio() {
-        if (audioList.isEmpty())
-            audioList = viewModel.getAudioList(applicationContext)
+        if (audioList.isEmpty()) audioList = viewModel.getAudioList(applicationContext)
 
         if (audioList.isNotEmpty()) {
             val backgroundAudio = Media(
-                mLibVLC,
-                audioList.random()
-            )
+                mLibVLC, audioList.random())
+            Log.d("audiox", backgroundAudio.toString())
             audioPlayer.play(backgroundAudio)
-        }
+        } else Log.d("audiox", "no audio")
     }
 
 
@@ -212,8 +212,7 @@ class PlayerManager(
         mVideoLayout.post {
             val playlist = currentPlaylist
             viewModel.playlistIndex++
-            if (viewModel.playlistIndex >= playlist.size)
-                viewModel.playlistIndex = 0
+            if (viewModel.playlistIndex >= playlist.size) viewModel.playlistIndex = 0
 
             playMediaByIndex(viewModel.playlistIndex)
         }
@@ -225,7 +224,6 @@ class PlayerManager(
                 when (event) {
                     MediaPlayer.Event.EndReached -> {
                         playNextMedia()
-                        //remove callback
                         mainPlayer!!.eventListener = {}
                     }
 
@@ -249,39 +247,56 @@ class PlayerManager(
     }
 
     private fun checkScheduledMediaList() {
-        timer.removeTimeListener(checkScheduledMediaListId)
-        val scheduledList = playlistRepo.scheduledList
-        checkScheduledMediaListId = timer.addTimeListener(Dispatchers.Default) { now ->
+        cancelPlaying()
 
-            var foundPeriod = false
+        if (playlistRepo.scheduledList.isEmpty()) {
+            setPlaylistContent(playlistRepo.unscheduledList, audioList)
+            currentPlaylistKey = "-1"
+        } else {
+            checkScheduledListTimer.removeTimeListener(checkScheduledMediaListId)
 
-            for (i in scheduledList.keys.indices) {
-                val period = scheduledList.keys.elementAt(i)
-
-                val t = period.split("-")
-
-                val start = toCalendar(t[0])
-                val end = toCalendar(t[1])
-
-                if (now in start.timeInMillis..end.timeInMillis) {
-
-                    if (currentPlaylistKey != period) {
-                        withContext(Dispatchers.Main)
-                        {
-                            setPlaylistContent(
-                                playlistRepo.scheduledList[period] ?: listOf(),
-                                audioList
-                            )
-                            currentPlaylistKey = period
-                        }
-                    }
-
-                    foundPeriod = true
-                    break
-                }
+            lifecycleScope.launch {
+                loopCheckList(Calendar.getInstance().timeInMillis)
             }
 
-            if (!foundPeriod && currentPlaylistKey != "-1") {
+            checkScheduledMediaListId =
+                checkScheduledListTimer.addTimeListener(Dispatchers.Default) { now ->
+                    Log.d("checklist", "check")
+                    loopCheckList(now)
+                }
+        }
+    }
+
+    private suspend fun loopCheckList(now: Long) {
+        var foundPeriod = false
+        val scheduledList = playlistRepo.scheduledList
+        for (i in scheduledList.keys.indices) {
+            val period = scheduledList.keys.elementAt(i)
+
+            val t = period.split("-")
+
+            val start = toCalendar(t[0])
+            val end = toCalendar(t[1])
+
+            if (now in start.timeInMillis..end.timeInMillis) {
+
+                if (currentPlaylistKey != period) {
+                    Log.d("scheduledlist", period)
+                    withContext(Dispatchers.Main) {
+                        setPlaylistContent(
+                            playlistRepo.scheduledList[period] ?: listOf(), audioList)
+                        currentPlaylistKey = period
+                    }
+                }
+
+                foundPeriod = true
+                break
+            }
+        }
+
+        if (!foundPeriod && currentPlaylistKey != "-1") {
+            Log.d("scheduledlist", "random")
+            withContext(Dispatchers.Main) {
                 setPlaylistContent(playlistRepo.unscheduledList, audioList)
                 currentPlaylistKey = "-1"
             }
@@ -294,14 +309,15 @@ class PlayerManager(
 
         viewModel.playlistIndex = 0
 
-        if (currentPlaylist.isNotEmpty())
-            playMediaByIndex(0)
+        if (currentPlaylist.isNotEmpty()) playMediaByIndex(0)
     }
 
     fun checkScheduledMedia() {
         timer.removeTimeListener(checkScheduledMediaJobId)
 
-        val playlist = currentPlaylist
+        val playlist = playlistRepo.broadcastList.filter {
+            it.path != "start" && it.path != "end"
+        }
         val scheduledItems: MutableList<MediaItem> = mutableListOf()
         scheduledItems.addAll(playlist.filter { it.fixTime.isNotEmpty() && it.fixTime != "00:00:00" })
 
@@ -321,13 +337,10 @@ class PlayerManager(
 
                     val mediaDuration = getDurationInSecond(mediaItem.duration ?: "00:00:00")
 
-                    if (scheduledTime.timeInMillis <= now.timeInMillis
-                        && now.timeInMillis <= scheduledTime.timeInMillis + mediaDuration * 1000
-                    ) {
+                    if (scheduledTime.timeInMillis <= now.timeInMillis && now.timeInMillis <= scheduledTime.timeInMillis + mediaDuration * 1000) {
                         Log.d(
                             "hengio",
-                            "${now.timeInMillis} - ${scheduledTime.timeInMillis} - ${scheduledTime.timeInMillis + mediaDuration * 1000}"
-                        )
+                            "${now.timeInMillis} - ${scheduledTime.timeInMillis} - ${scheduledTime.timeInMillis + mediaDuration * 1000}")
                         index = i
                     }
 
@@ -337,13 +350,10 @@ class PlayerManager(
             }
 
             if (index != -1 && index < scheduledItems.size) {
-                withContext(Dispatchers.Main)
-                {
-                    val indexToPlay = playlist.indexOf(scheduledItems[index])
-
-                    playMediaByIndex(indexToPlay)
-                    Log.d("Scheduled", "play scheduled $indexToPlay")
-                    viewModel.playlistIndex = indexToPlay
+                withContext(Dispatchers.Main) {
+                    val mediaToPlay = scheduledItems[index]
+                    playMedia(mediaToPlay)
+                    Log.d("hengio", mediaToPlay.name ?: "")
                     scheduledItems.removeAt(index)
                 }
             }
@@ -418,6 +428,16 @@ class PlayerManager(
         }*/
     }
 
+    fun cancelPlaying() {
+        visualPlayer.eventListener = {}
+        audioPlayer.eventListener = {}
+
+        presentImageJob?.cancel()
+
+        visualPlayer.stop()
+        audioPlayer.stop()
+    }
+
     fun onActivityStop() {
         mainPlayer?.stop()
         audioPlayer.stop()
@@ -430,11 +450,9 @@ class PlayerManager(
         presentImageJob?.cancel()
 
         mainPlayer?.release()
-        if (!audioPlayer.isReleased)
-            audioPlayer.release()
+        if (!audioPlayer.isReleased) audioPlayer.release()
 
-        if (!visualPlayer.isReleased)
-            visualPlayer.release()
+        if (!visualPlayer.isReleased) visualPlayer.release()
 
         mLibVLC.release()
     }

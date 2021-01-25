@@ -3,6 +3,7 @@ package app.tek4tv.digitalsignage
 import android.app.Activity
 import android.util.Log
 import app.tek4tv.digitalsignage.model.PingHubRequest
+import app.tek4tv.digitalsignage.model.ReponseHub
 import app.tek4tv.digitalsignage.model.Video
 import app.tek4tv.digitalsignage.utils.NetworkUtils
 import app.tek4tv.digitalsignage.utils.Status
@@ -32,9 +33,13 @@ class HubManager(
 
     private var openNewConnectionJob: Job? = null
 
+    //current response Hub
+    var responseHub = ReponseHub()
+
+    var receivedConnectionId = ""
+
     fun createNewHubConnection() {
-        if (openNewConnectionJob != null && openNewConnectionJob!!.isActive)
-            return
+        if (openNewConnectionJob != null && openNewConnectionJob!!.isActive) return
 
         hubConnection = HubConnectionBuilder.create(NetworkUtils.URL_HUB).build()
 
@@ -70,25 +75,31 @@ class HubManager(
     }
 
     private fun onMessage() {
-        hubConnection?.on(
-            "ReceiveMessage",
-            { command: String?, message: String? ->
-                mainActivity.runOnUiThread {
-                    Log.d("command", command ?: "")
-                    Log.d("message", message ?: "")
+        hubConnection?.on("ReceiveMessage", { command: String?, message: String? ->
+            mainActivity.runOnUiThread {
+                Log.d("command", command ?: "")
+                Log.d("message", message ?: "")
 
-                    //Handle command from server in MainActivity
-                    onMessageListener.invoke(command, message)
+                parseHubResponse(message)
 
-                    if (command != null && message != null && command == Status.PONG) {
-                        lastPing = message
-                        Log.d("last ping", lastPing)
+                if (command != null && message != null) {
+                    when (command) {
+                        Status.PONG -> {
+                            lastPing = message
+                            Log.d("last ping", lastPing)
+                        }
+
+                        Status.UPDATE_STATUS -> {
+                            if (responseHub.message != null) receivedConnectionId =
+                                responseHub.message!!
+                        }
                     }
                 }
-            },
-            String::class.java,
-            String::class.java
-        )
+
+                //Handle command from server in MainActivity
+                onMessageListener.invoke(command, message)
+            }
+        }, String::class.java, String::class.java)
     }
 
     fun sendMessage(mess: String, command: String) {
@@ -182,6 +193,20 @@ class HubManager(
                     }
                 }
             }
+        }
+    }
+
+    private fun parseHubResponse(message: String?) {
+        if (message.isNullOrEmpty()) return
+
+        try {
+            responseHub = ReponseHub()
+            if (message.startsWith("{")) {
+                val jsonAdapter = moshi.adapter(ReponseHub::class.java)
+                responseHub = jsonAdapter.fromJson(message)!!
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
     }
 }

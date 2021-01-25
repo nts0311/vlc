@@ -34,6 +34,8 @@ class PlaylistRepo @Inject constructor(
     var unscheduledList = mutableListOf<MediaItem>()
 
     suspend fun getBroadcastList(storagePath: String, needUpdate: Boolean): List<MediaItem> {
+        scheduledList.clear()
+        unscheduledList.clear()
 
         broadcastList = if (needUpdate) {
             updatePlaylist(storagePath)

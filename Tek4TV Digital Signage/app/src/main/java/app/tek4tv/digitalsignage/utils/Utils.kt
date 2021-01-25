@@ -19,9 +19,8 @@ class Utils {
         const val DEVICE_INFO = "DEVICE_INFO"
 
         @SuppressLint("HardwareIds")
-        fun getDeviceId(context: Context): String? {
-            var deviceId: String? =
-                ConfigUtil.getString(context, DEVICE_ID, null)
+        fun getDeviceId(context: Context): String {
+            var deviceId: String? = ConfigUtil.getString(context, DEVICE_ID, null)
             if (deviceId == null) {
                 deviceId = getMacAddr()
                 ConfigUtil.putString(context, DEVICE_ID, deviceId)
@@ -29,7 +28,7 @@ class Utils {
             return deviceId
         }
 
-        fun getMacAddr(): String? {
+        fun getMacAddr(): String {
             try {
                 val all: List<NetworkInterface> =
                     Collections.list(NetworkInterface.getNetworkInterfaces())

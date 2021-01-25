@@ -22,29 +22,8 @@ class CrashHandler(private val activity: Activity) : Thread.UncaughtExceptionHan
         if (appInstance != null) {
             logToFile(thread, ex)
 
-            //restartApp(appInstance)
+            //restartApp(appInstance, activity)
         }
-    }
-
-    private fun restartApp(appInstance: MyApp) {
-        val intent = Intent(activity, MainActivity::class.java)
-        intent.putExtra("crash", true)
-        intent.addFlags(
-            Intent.FLAG_ACTIVITY_CLEAR_TOP
-                    or Intent.FLAG_ACTIVITY_CLEAR_TASK
-                    or Intent.FLAG_ACTIVITY_NEW_TASK
-        )
-        val pendingIntent = PendingIntent.getActivity(
-            appInstance.baseContext,
-            0,
-            intent,
-            PendingIntent.FLAG_ONE_SHOT
-        )
-        val mgr = appInstance.baseContext
-            .getSystemService(Context.ALARM_SERVICE) as AlarmManager
-        mgr[AlarmManager.RTC, System.currentTimeMillis() + 100] = pendingIntent
-        activity.finish()
-        System.exit(2)
     }
 
     private fun logToFile(thread: Thread, ex: Throwable) {
@@ -69,6 +48,22 @@ class CrashHandler(private val activity: Activity) : Thread.UncaughtExceptionHan
             out.close()
         } catch (e: Exception) {
 
+        }
+    }
+
+    companion object {
+        fun restartApp(appInstance: MyApp, activity: Activity) {
+            val intent = Intent(activity, MainActivity::class.java)
+            intent.putExtra("crash", true)
+            intent.addFlags(
+                Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_CLEAR_TASK or Intent.FLAG_ACTIVITY_NEW_TASK)
+            val pendingIntent = PendingIntent.getActivity(
+                appInstance.baseContext, 0, intent, PendingIntent.FLAG_ONE_SHOT)
+            val mgr =
+                appInstance.baseContext.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+            mgr[AlarmManager.RTC, System.currentTimeMillis() + 100] = pendingIntent
+            activity.finish()
+            System.exit(2)
         }
     }
 }
