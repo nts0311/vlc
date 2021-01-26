@@ -3,19 +3,7 @@ package app.tek4tv.digitalsignage.media
 import android.util.Log
 import java.util.*
 
-data class TimeRange(private val start: String, private val end: String) {
 
-    val startTime: Calendar = toCalendar(start)
-    val endTime: Calendar = toCalendar(end)
-
-
-    operator fun contains(c: Calendar): Boolean {
-        return c.timeInMillis >= startTime.timeInMillis
-                && c.timeInMillis <= endTime.timeInMillis
-    }
-
-
-}
 
 
 fun toCalendar(time: String): Calendar {
@@ -32,3 +20,17 @@ fun toCalendar(time: String): Calendar {
     }
 }
 
+fun getDurationInSecond(duration: String): Long {
+    return try {
+        (duration.split(":").mapIndexed { index, s ->
+            when (index) {
+                0 -> s.toInt() * 3600
+                1 -> s.toInt() * 60
+                2 -> s.toInt()
+                else -> 0
+            }
+        }.fold(0L) { acc, it -> acc + it })
+    } catch (e: Exception) {
+        0
+    }
+}
