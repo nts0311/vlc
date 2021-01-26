@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Context.ACTIVITY_SERVICE
 import android.net.*
 import android.net.ConnectivityManager.NetworkCallback
+import android.net.wifi.WifiManager
 import android.os.Build
 import android.telephony.*
 import android.util.Log
@@ -183,6 +184,13 @@ class NetworkUtils private constructor() {
             }
 
             return CellSignalStrength.SIGNAL_STRENGTH_NONE_OR_UNKNOWN
+        }
+
+        fun getWifiSignalStrength(appContext: Context): Int {
+            val wifiManager =
+                appContext.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
+            val rssi = wifiManager.connectionInfo.rssi
+            return WifiManager.calculateSignalLevel(rssi, 5)
         }
     }
 }

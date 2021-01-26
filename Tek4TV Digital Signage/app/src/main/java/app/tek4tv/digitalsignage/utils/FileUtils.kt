@@ -6,7 +6,6 @@ import java.io.*
 
 const val PLAYLIST_FILE_NAME = "playlist.json"
 const val AUDIO_FOLDER_NAME = "audios"
-const val AUDIO_LIST_FILE_NAME = "audio_list.json"
 
 fun isFileExisted(storagePath: String, fileName: String): Boolean {
     val file = File(storagePath, fileName)
@@ -36,7 +35,6 @@ suspend fun writeFile(filePath: String, content: String) {
     }
 }
 
-@Throws(IOException::class)
 fun createFolder(storagePath: String): Boolean {
     val folder = File(storagePath)
     var success = false
@@ -48,18 +46,21 @@ fun createFolder(storagePath: String): Boolean {
     return success
 }
 
-@Throws(IOException::class)
 fun isFolderExisted(storagePath: String): Boolean {
     val folder = File(storagePath)
     return folder.exists() && folder.isDirectory
 }
 
-@Throws(IOException::class)
 fun getAllFileNameInFolder(storagePath: String): List<String> {
     val folder = File(storagePath)
     val audio = listOf("mp3")
     return folder.listFiles().filter { file -> file.isFile && audio.any { file.name.endsWith(it) } }
         .map { it.name }
+}
+
+fun getAllFilePathInFolder(storagePath: String): List<String> {
+    val folder = File(storagePath)
+    return folder.listFiles().filter { it.isFile }.map { it.path }
 }
 
 fun getFolderSize(path: String): Long {
@@ -69,13 +70,25 @@ fun getFolderSize(path: String): Long {
         var size = 0L
 
         for (f in folder.listFiles()) {
-            if (f.isFile)
-                size += f.length()
+            if (f.isFile) size += f.length()
         }
 
         size
     } catch (e: Exception) {
+        e.printStackTrace()
         -1L
+    }
+}
+
+fun deleteAllFileInFolder(path: String) {
+    val folder = File(path)
+    try {
+        for (f in folder.listFiles()) {
+            if (f.isFile) f.delete()
+        }
+
+    } catch (e: Exception) {
+        e.printStackTrace()
     }
 }
 

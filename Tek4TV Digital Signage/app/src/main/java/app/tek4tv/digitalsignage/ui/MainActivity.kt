@@ -17,6 +17,7 @@ import app.tek4tv.digitalsignage.model.*
 import app.tek4tv.digitalsignage.utils.*
 import app.tek4tv.digitalsignage.viewmodels.MainViewModel
 import com.squareup.moshi.Moshi
+import com.squareup.moshi.Types
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.*
 import org.videolan.libvlc.*
@@ -44,6 +45,7 @@ class MainActivity : AppCompatActivity() {
         Manifest.permission.WRITE_SETTINGS,
         Manifest.permission.ACCESS_FINE_LOCATION,
         Manifest.permission.ACCESS_COARSE_LOCATION,
+        Manifest.permission.ACCESS_WIFI_STATE,
     )
 
     private lateinit var mVideoLayout: VLCVideoLayout
@@ -57,6 +59,10 @@ class MainActivity : AppCompatActivity() {
     private lateinit var playerManager: PlayerManager
     private lateinit var audioManager: AudioManager
 
+    private lateinit var serialPortController: SerialPortController
+
+    private lateinit var appStorageManager: AppStorageManager
+
     private lateinit var preference: SharedPreferences
 
     private var volume = "100"
@@ -64,20 +70,24 @@ class MainActivity : AppCompatActivity() {
 
     private var locationTracker = LocationTracker()
 
-    private lateinit var serialPortController: SerialPortController
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        //TODO : enable this
         Thread.setDefaultUncaughtExceptionHandler(CrashHandler(this))
 
         preference = getPreferences(MODE_PRIVATE)
         requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
 
+        if (needGrantPermission()) requestPermissions(permissions, UPDATE_PERMISSION_REQUEST_CODE)
 
-        if (needGrantPermission()) requestAppPermission()
+        hubManager = HubManager(lifecycleScope, this, viewModel, moshi) { command, message ->
+            handleFromCommandServer(command, message)
+        }
+
+        serialPortController =
+            SerialPortController(applicationContext, lifecycleScope, hubManager, moshi)
+        serialPortController.connectToSerialPort()
 
         mVideoLayout = findViewById(R.id.video_layout)
         playerManager = PlayerManager(applicationContext, lifecycleScope, viewModel, mVideoLayout)
@@ -88,16 +98,10 @@ class MainActivity : AppCompatActivity() {
 
         audioManager = getSystemService(AUDIO_SERVICE) as AudioManager
 
-        hubManager = HubManager(lifecycleScope, this, viewModel, moshi) { command, message ->
-            handleFromCommandServer(command, message)
-        }
-
-        serialPortController =
-            SerialPortController(applicationContext, lifecycleScope, hubManager, moshi)
-        serialPortController.connectToSerialPort()
-
         initHubConnect()
         registerObservers()
+
+        appStorageManager = AppStorageManager(applicationContext)
     }
 
     override fun onStop() {
@@ -116,19 +120,6 @@ class MainActivity : AppCompatActivity() {
         startPlayingMedia()
     }
 
-    override fun onRequestPermissionsResult(
-        requestCode: Int, permissions: Array<out String>, grantResults: IntArray
-    ) {
-        when (requestCode) {
-            UPDATE_PERMISSION_REQUEST_CODE -> {
-                // If request is cancelled, the result arrays are empty.
-                if (grantResults.size > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                } else {
-                }
-            }
-        }
-    }
-
     private fun needGrantPermission(): Boolean {
         var needGrantPermission = false
 
@@ -142,19 +133,11 @@ class MainActivity : AppCompatActivity() {
         return needGrantPermission
     }
 
-    private fun requestAppPermission() {
-        requestPermissions(permissions, UPDATE_PERMISSION_REQUEST_CODE)
-    }
-
-
     private fun registerObservers() {
         viewModel.broadcastList.observe(this) {
             playerManager.audioList = viewModel.getAudioList(applicationContext)
             playerManager.onNewBroadcastList()
-            //playerManager.setPlaylistContent(it, viewModel.getAudioList(applicationContext))
-
             playerManager.checkScheduledMedia()
-
             viewModel.downloadMedias(applicationContext)
         }
     }
@@ -180,7 +163,6 @@ class MainActivity : AppCompatActivity() {
             } else {
                 hubManager.hubConnection = null
             }
-
         }
     }
 
@@ -229,22 +211,20 @@ class MainActivity : AppCompatActivity() {
                         }
                     }
                     Status.GET_LOCATION -> {
-                        if (locationTracker.mlocation != null) {
-                            val connectionId = responseHub.message
+                        val connectionId = responseHub.message
+                        if (locationTracker.mlocation != null && connectionId != null) {
+
                             val result =
                                 "${locationTracker.mlocation!!.latitude},${locationTracker.mlocation!!.longitude}"
-                            Log.d("location", connectionId)
 
-                            val receiveMessage =
-                                DirectMessage(Utils.getDeviceId(applicationContext)!!, result)
-
-
-                            hubManager.sendDirectMessage(
-                                connectionId!!, Utils.DEVICE_LOCATION, Utils.toJsonString(
-                                    moshi, DirectMessage::class.java, receiveMessage))
+                            hubManager.sendHubDirectMessage(
+                                connectionId, Utils.DEVICE_LOCATION, result)
                         } else Log.d("location", "location not found")
                     }
                     Status.SET_VOLUME -> {
+                        if (responseHub.message != null) {
+                            setVolume(responseHub.message!!)
+                        }
                     }
                     Status.STOP -> {
                     }
@@ -265,17 +245,21 @@ class MainActivity : AppCompatActivity() {
                     Status.SWITCH_MODE_FM -> {
                     }
                     Status.SET_MUTE_DEVICE -> {
-                        serialPortController.apply {
-                            writeToDevice(
-                                buildWriteMessage(
-                                    Define.FUNC_WRITE_FORCE_SET_MUTE, responseHub.message ?: ""))
+                        if (responseHub.message != null) {
+                            serialPortController.apply {
+                                writeToDevice(
+                                    buildWriteMessage(
+                                        Define.FUNC_WRITE_FORCE_SET_MUTE, responseHub.message!!))
+                            }
                         }
                     }
                     Status.SET_VOLUME_DEVICE -> {
-                        serialPortController.apply {
-                            writeToDevice(
-                                buildWriteMessage(
-                                    Define.FUNC_WRITE_FORCE_SET_VOLUME, responseHub.message ?: ""))
+                        if (responseHub.message != null) {
+                            serialPortController.apply {
+                                writeToDevice(
+                                    buildWriteMessage(
+                                        Define.FUNC_WRITE_FORCE_SET_VOLUME, responseHub.message!!))
+                            }
                         }
                     }
 
@@ -296,8 +280,6 @@ class MainActivity : AppCompatActivity() {
                         }
                     }
                     Status.ROTATION -> {
-
-
                         if (responseHub.message != null) {
                             Log.d("rotation", responseHub.message.toString())
                             try {
@@ -315,17 +297,13 @@ class MainActivity : AppCompatActivity() {
 
                     Status.SET_TIME_OVER -> {
                         serialPortController.apply {
-                            writeToDevice(
-                                buildReadMessage(
-                                    Define.FUNC_WRITE_PLAY_NO_SOURCE, ""))
+                            writeToDevice(buildReadMessage(Define.FUNC_WRITE_PLAY_NO_SOURCE, ""))
                         }
                     }
 
                     Status.SET_TIME_ON -> {
                         serialPortController.apply {
-                            writeToDevice(
-                                buildReadMessage(
-                                    Define.FUNC_WRITE_PLAY_VOD_LIVE, volume))
+                            writeToDevice(buildReadMessage(Define.FUNC_WRITE_PLAY_VOD_LIVE, volume))
                         }
                     }
 
@@ -344,32 +322,66 @@ class MainActivity : AppCompatActivity() {
                     }
 
                     Status.NETWORK_INFO -> {
-
                         val connectionId = responseHub.message
+                        if (connectionId != null) {
+                            val networkClass = NetworkUtils.getNetworkClass(applicationContext)
+                            val dataUsage = NetworkUtils.networkUsage(applicationContext)
 
-                        val networkClass = NetworkUtils.getNetworkClass(applicationContext)
-                        val dataUsage = NetworkUtils.networkUsage(applicationContext)
+                            val level = when (networkClass) {
+                                "WIFI" -> NetworkUtils.getWifiSignalStrength(
+                                    applicationContext)
+                                "?" -> 0
+                                else -> NetworkUtils.getCellSignalStrength(applicationContext)
+                            }
 
-                        val result = "$networkClass,$dataUsage"
+                            val result = "$networkClass,$dataUsage,$level"
 
-                        val receiveMessage =
-                            DirectMessage(Utils.getDeviceId(applicationContext)!!, result)
+                            hubManager.sendHubDirectMessage(
+                                connectionId, Utils.NETWORK_INFO, result)
+                        }
+                    }
 
+                    Status.STORAGE_INFO -> {
+                        val connectionId = responseHub.message
+                        if (connectionId != null) {
+                            val info = appStorageManager.run {
+                                "${getTotalRam()},${getUsedRam()},${getTotalRomStorage()},${getUsedRomStorage()}"
+                            }
 
-                        hubManager.sendDirectMessage(
-                            connectionId!!,
-                            Utils.NETWORK_INFO,
-                            Utils.toJsonString(moshi, DirectMessage::class.java, receiveMessage))
+                            hubManager.sendHubDirectMessage(connectionId, Utils.STORAGE_INFO, info)
+                        }
+                    }
 
-                        Log.d(
-                            "directmess",
-                            Utils.toJsonString(moshi, DirectMessage::class.java, receiveMessage))
+                    Status.GET_AUDIO_PATH -> {
+                        val connectionId = responseHub.message
+                        if (connectionId != null) {
+                            val audioList = toJsonList(appStorageManager.getAllMusicPath())
+                            hubManager.sendHubDirectMessage(
+                                connectionId, Utils.GET_AUDIO_PATH, audioList)
+                        }
+                    }
+
+                    Status.GET_MEDIA_PATH -> {
+                        val connectionId = responseHub.message
+                        if (connectionId != null) {
+                            Log.d("connectionId", connectionId)
+                            val mediaList = toJsonList(appStorageManager.getAllMediaPath())
+                            hubManager.sendHubDirectMessage(
+                                connectionId, Utils.GET_MEDIA_PATH, mediaList)
+                        }
                     }
                 }
             }
         } catch (e: java.lang.Exception) {
             e.printStackTrace()
         }
+    }
+
+
+    private fun toJsonList(list: List<String>): String {
+        val listType = Types.newParameterizedType(List::class.java, String::class.java)
+        val adapter = moshi.adapter<List<String>>(listType)
+        return adapter.toJson(list)
     }
 
     private fun setMute(mute: String) {

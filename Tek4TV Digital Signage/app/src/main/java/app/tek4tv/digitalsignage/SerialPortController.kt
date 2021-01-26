@@ -2,7 +2,6 @@ package app.tek4tv.digitalsignage
 
 import android.content.Context
 import android.util.Log
-import app.tek4tv.digitalsignage.model.DirectMessage
 import app.tek4tv.digitalsignage.utils.Define
 import app.tek4tv.digitalsignage.utils.NetworkUtils
 import app.tek4tv.digitalsignage.utils.Utils
@@ -119,8 +118,6 @@ class SerialPortController(
                     try {
                         val buffer = ByteArray(64)
                         if (inputStream == null) return@withContext
-                        val a = inputStream!!.available()
-                        Log.d("aaa", a.toString())
 
                         size = inputStream!!.read(buffer)
 
@@ -151,11 +148,13 @@ class SerialPortController(
         if (data!!.endsWith("\r\n")) {
             if (data != null && !data.isEmpty() && data.startsWith("$$,")) {
                 if (isRead) {
-                    val receiveMessage = DirectMessage(Utils.getDeviceId(appContext), data)
+                    /*val receiveMessage = DirectMessage(Utils.getDeviceId(appContext), data)
                     hubManager.sendDirectMessage(
                         hubManager.receivedConnectionId,
                         Utils.DEVICE_INFO,
-                        Utils.toJsonString(moshi, DirectMessage::class.java, receiveMessage))
+                        Utils.toJsonString(moshi, DirectMessage::class.java, receiveMessage))*/
+                    hubManager.sendHubDirectMessage(
+                        hubManager.receivedConnectionId, Utils.DEVICE_INFO, data)
                     isRead = false
                 }
             }

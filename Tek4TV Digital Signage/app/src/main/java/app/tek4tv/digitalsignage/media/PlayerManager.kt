@@ -49,6 +49,8 @@ class PlayerManager(
         get() = viewModel.playlistRepo
 
     var currentPlaylist = listOf<MediaItem>()
+
+    private var audioIndex = 50
     var audioList = listOf<Uri>()
 
     //-1 for random unscheduled media
@@ -68,7 +70,7 @@ class PlayerManager(
         timer.start()
 
         checkScheduledListTimer = Timer(lifecycleScope)
-        checkScheduledListTimer.delay = 15000
+        checkScheduledListTimer.delay = 3000
         checkScheduledListTimer.start()
 
         mLibVLC = LibVLC(applicationContext, args)
@@ -177,9 +179,6 @@ class PlayerManager(
         val imageList = mutableListOf(mediaItem)
 
         imageList.addAll(playlistRepo.unscheduledList.filter { it.getMediaType() == MediaType.IMAGE })
-
-        val delayDuration = 15000L
-
         playRandomAudio()
 
         presentImageJob = lifecycleScope.launch {
@@ -188,21 +187,42 @@ class PlayerManager(
                 val media = if (!playedMainImage) {
                     playedMainImage = true
                     mediaItem
-                } else imageList.random()
+                } else {
+                    imageList.random()
+                }
+                val delayDuration = getMediaDuration(media)
                 visualPlayer.play(media.getVlcMedia(mLibVLC))
                 media.getVlcMedia(mLibVLC).release()
+                Log.d("delay", delayDuration.toString())
                 delay(delayDuration)
             }
         }
     }
 
+    private fun getMediaDuration(mediaItem: MediaItem): Long {
+        if (mediaItem.duration != null) {
+            val mediaDuration = getDurationInSecond(mediaItem.duration!!)
+            if (mediaDuration > 0) return mediaDuration * 1000
+        }
+
+        return 15000L
+    }
+
     private fun playRandomAudio() {
-        if (audioList.isEmpty()) audioList = viewModel.getAudioList(applicationContext)
+        if (audioList.isEmpty()) {
+            audioList = viewModel.getAudioList(applicationContext)
+            audioIndex = 0
+        }
 
         if (audioList.isNotEmpty()) {
+            if (audioIndex >= audioList.size) {
+                audioIndex = 0
+                audioList = audioList.shuffled()
+            }
+
+            Log.d("audiox", audioIndex.toString())
             val backgroundAudio = Media(
-                mLibVLC, audioList.random())
-            Log.d("audiox", backgroundAudio.toString())
+                mLibVLC, audioList[audioIndex++])
             audioPlayer.play(backgroundAudio)
         } else Log.d("audiox", "no audio")
     }
@@ -249,22 +269,17 @@ class PlayerManager(
     private fun checkScheduledMediaList() {
         cancelPlaying()
 
-        if (playlistRepo.scheduledList.isEmpty()) {
-            setPlaylistContent(playlistRepo.unscheduledList, audioList)
-            currentPlaylistKey = "-1"
-        } else {
-            checkScheduledListTimer.removeTimeListener(checkScheduledMediaListId)
-
-            lifecycleScope.launch {
-                loopCheckList(Calendar.getInstance().timeInMillis)
-            }
-
-            checkScheduledMediaListId =
-                checkScheduledListTimer.addTimeListener(Dispatchers.Default) { now ->
-                    Log.d("checklist", "check")
-                    loopCheckList(now)
-                }
+        lifecycleScope.launch {
+            loopCheckList(Calendar.getInstance().timeInMillis)
         }
+
+        checkScheduledListTimer.removeTimeListener(checkScheduledMediaListId)
+
+        checkScheduledMediaListId =
+            checkScheduledListTimer.addTimeListener(Dispatchers.Default) { now ->
+                Log.d("checklist", "check")
+                loopCheckList(now)
+            }
     }
 
     private suspend fun loopCheckList(now: Long) {

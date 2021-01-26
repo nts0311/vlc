@@ -2,6 +2,7 @@ package app.tek4tv.digitalsignage
 
 import android.app.Activity
 import android.util.Log
+import app.tek4tv.digitalsignage.model.DirectMessage
 import app.tek4tv.digitalsignage.model.PingHubRequest
 import app.tek4tv.digitalsignage.model.ReponseHub
 import app.tek4tv.digitalsignage.model.Video
@@ -115,13 +116,22 @@ class HubManager(
         }
     }
 
-    fun sendDirectMessage(connectionId: String, command: String, message: String) {
+    private fun sendDirectMessage(connectionId: String, command: String, message: String) {
         try {
             hubConnection!!.invoke(Utils.DIRECT_MESSAGE, connectionId, command, message)
         } catch (e: Exception) {
             Log.e(LOG_TAG, e.message)
             e.printStackTrace()
         }
+    }
+
+    fun sendHubDirectMessage(connectionId: String, command: String, message: String) {
+        val directMessage = DirectMessage(Utils.getDeviceId(mainActivity), message)
+
+        sendDirectMessage(
+            connectionId,
+            command,
+            Utils.toJsonString(moshi, DirectMessage::class.java, directMessage))
     }
 
     fun pingHub() {

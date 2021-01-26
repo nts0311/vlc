@@ -10,6 +10,7 @@ import java.util.*
 
 class Utils {
     companion object {
+        const val STORAGE_INFO = "STORAGE_INFO"
         const val ping = "Ping"
         const val DEVICE_ID = "device_id"
         const val APP_VERSION = "APP_VERSION"
@@ -17,6 +18,8 @@ class Utils {
         const val DEVICE_LOCATION = "DEVICE_LOCATION"
         const val DIRECT_MESSAGE = "DirectMessage"
         const val DEVICE_INFO = "DEVICE_INFO"
+        const val GET_AUDIO_PATH = "GET_AUDIO_PATH"
+        const val GET_MEDIA_PATH = "GET_MEDIA_PATH"
 
         @SuppressLint("HardwareIds")
         fun getDeviceId(context: Context): String {

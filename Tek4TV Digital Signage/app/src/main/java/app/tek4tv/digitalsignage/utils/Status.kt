@@ -33,4 +33,7 @@ object Status {
     const val GET_APP_VERSION = "GET_APP_VERSION"
     const val DTMF_STATUS = "DTMF_STATUS"
     const val NETWORK_INFO = "NETWORK_INFO"
+    const val STORAGE_INFO = "STORAGE_INFO"
+    const val GET_AUDIO_PATH = "GET_AUDIO_PATH"
+    const val GET_MEDIA_PATH = "GET_MEDIA_PATH"
 }

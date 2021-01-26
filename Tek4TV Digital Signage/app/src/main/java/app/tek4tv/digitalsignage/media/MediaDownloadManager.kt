@@ -28,7 +28,8 @@ class MediaDownloadManager(
             field = value
 
             playlist = broadcastList.filter {
-                it.path != "start" || it.path != "end"
+                val res = it.path != "start" && it.path != "end"
+                res
             }
         }
     private var checkPlaylistJob: Job? = null
@@ -37,7 +38,6 @@ class MediaDownloadManager(
     private var playlist: List<MediaItem> = listOf()
 
     fun checkPlaylist(appContext: Context) {
-        //if (checkPlaylistJob != null) return
         checkPlaylistJob?.cancel()
 
         checkPlaylistJob = scope.launch {
