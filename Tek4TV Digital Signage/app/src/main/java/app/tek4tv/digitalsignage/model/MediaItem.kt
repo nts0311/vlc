@@ -98,22 +98,6 @@ enum class MediaType {
 }
 
 
-fun getDurationInSecond(duration: String): Long {
-    return try {
-        (duration.split(":").mapIndexed { index, s ->
-            when (index) {
-                0 -> s.toInt() * 3600
-                1 -> s.toInt() * 60
-                2 -> s.toInt()
-                else -> 0
-            }
-        }
-            .fold(0L) { acc, it -> acc + it })
-    } catch (e: Exception) {
-        0
-    }
-}
-
 @JsonClass(generateAdapter = true)
 data class Category(
 

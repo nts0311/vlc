@@ -6,7 +6,6 @@ import android.util.Log
 import app.tek4tv.digitalsignage.Timer
 import app.tek4tv.digitalsignage.model.MediaItem
 import app.tek4tv.digitalsignage.model.MediaType
-import app.tek4tv.digitalsignage.model.getDurationInSecond
 import app.tek4tv.digitalsignage.repo.PlaylistRepo
 import app.tek4tv.digitalsignage.ui.CustomPlayer
 import app.tek4tv.digitalsignage.viewmodels.MainViewModel
@@ -96,8 +95,6 @@ class PlayerManager(
             if (playlist.isEmpty()) return
             val mediaItem = playlist[index]
 
-            viewModel.currentMediaItem = mediaItem
-
             playMedia(mediaItem)
 
         } catch (e: Exception) {
@@ -107,6 +104,7 @@ class PlayerManager(
 
     private fun playMedia(mediaItem: MediaItem) {
         try {
+            viewModel.currentMediaItem = mediaItem
             val media = mediaItem.getVlcMedia(mLibVLC)
 
             presentImageJob?.cancel()
@@ -318,13 +316,30 @@ class PlayerManager(
         }
     }
 
-    fun setPlaylistContent(playlist: List<MediaItem>, audios: List<Uri>) {
+    private fun setPlaylistContent(playlist: List<MediaItem>, audios: List<Uri>) {
         this.currentPlaylist = playlist
         this.audioList = audios
 
         viewModel.playlistIndex = 0
 
-        if (currentPlaylist.isNotEmpty()) playMediaByIndex(0)
+        if (currentPlaylist.isNotEmpty()) {
+
+            //if the first item is scheduled, skip over and play the second media
+            val firstItem = playlist[0]
+            if (firstItem.fixTime != "00:00:00") {
+                val now = Calendar.getInstance()
+                val scheduledTime = toCalendar(firstItem.fixTime)
+
+                if (now.timeInMillis < scheduledTime.timeInMillis && currentPlaylist.size > 2) {
+                    playMediaByIndex(1)
+                    viewModel.playlistIndex = 1
+                    return
+                }
+            }
+
+
+            playMediaByIndex(0)
+        }
     }
 
     fun checkScheduledMedia() {
@@ -347,16 +362,14 @@ class PlayerManager(
             scheduledItems.forEachIndexed { i, mediaItem ->
                 try {
                     val now = Calendar.getInstance()
-
                     val scheduledTime = toCalendar(mediaItem.fixTime)
-
                     val mediaDuration = getDurationInSecond(mediaItem.duration ?: "00:00:00")
-
                     if (scheduledTime.timeInMillis <= now.timeInMillis && now.timeInMillis <= scheduledTime.timeInMillis + mediaDuration * 1000) {
                         Log.d(
                             "hengio",
                             "${now.timeInMillis} - ${scheduledTime.timeInMillis} - ${scheduledTime.timeInMillis + mediaDuration * 1000}")
-                        index = i
+
+                        if (scheduledItems[i] != viewModel.currentMediaItem) index = i
                     }
 
                 } catch (e: Exception) {
