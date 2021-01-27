@@ -5,7 +5,6 @@ import android.util.Log
 import app.tek4tv.digitalsignage.utils.Define
 import app.tek4tv.digitalsignage.utils.NetworkUtils
 import app.tek4tv.digitalsignage.utils.Utils
-import com.squareup.moshi.Moshi
 import kotlinx.coroutines.*
 import java.io.File
 import java.io.IOException
@@ -17,8 +16,7 @@ import java.util.*
 class SerialPortController(
     private val appContext: Context,
     private val coroutineScope: CoroutineScope,
-    private val hubManager: HubManager,
-    private val moshi: Moshi
+    private val hubManager: HubManager
 ) {
     private var serialPort: SerialPort? = null
     private var inputStream: InputStream? = null

@@ -86,7 +86,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         serialPortController =
-            SerialPortController(applicationContext, lifecycleScope, hubManager, moshi)
+            SerialPortController(applicationContext, lifecycleScope, hubManager)
         serialPortController.connectToSerialPort()
 
         mVideoLayout = findViewById(R.id.video_layout)

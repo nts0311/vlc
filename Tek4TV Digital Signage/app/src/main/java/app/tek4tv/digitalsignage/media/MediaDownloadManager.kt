@@ -4,11 +4,9 @@ import android.content.Context
 import android.net.Uri
 import android.util.Log
 import app.tek4tv.digitalsignage.model.MediaItem
+import app.tek4tv.digitalsignage.model.MediaType
 import app.tek4tv.digitalsignage.repo.PlaylistRepo
-import app.tek4tv.digitalsignage.utils.AUDIO_FOLDER_NAME
-import app.tek4tv.digitalsignage.utils.createFolder
-import app.tek4tv.digitalsignage.utils.isFileExisted
-import app.tek4tv.digitalsignage.utils.isFolderExisted
+import app.tek4tv.digitalsignage.utils.*
 import com.downloader.Error
 import com.downloader.OnDownloadListener
 import com.downloader.PRDownloader
@@ -98,6 +96,9 @@ class MediaDownloadManager(
                                     it.path = "$storagePath/$fileName"
                                     savePlaylist(broadcastList, storagePath)
                                     Log.d("downloadcomplete", it.path)
+                                    if (it.getMediaType() == MediaType.IMAGE) {
+                                        ImageUtils.resizeImage(it.path)
+                                    }
                                 }
 
                                 override fun onError(error: Error?) {

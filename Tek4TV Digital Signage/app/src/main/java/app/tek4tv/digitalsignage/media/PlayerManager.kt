@@ -49,7 +49,7 @@ class PlayerManager(
 
     var currentPlaylist = listOf<MediaItem>()
 
-    private var audioIndex = 50
+    private var audioIndex = 0
     var audioList = listOf<Uri>()
 
     //-1 for random unscheduled media
@@ -106,6 +106,8 @@ class PlayerManager(
         try {
             viewModel.currentMediaItem = mediaItem
             val media = mediaItem.getVlcMedia(mLibVLC)
+
+            Log.d("mediaplayed", mediaItem.path)
 
             presentImageJob?.cancel()
 
@@ -265,7 +267,7 @@ class PlayerManager(
     }
 
     private fun checkScheduledMediaList() {
-        cancelPlaying()
+        //cancelPlaying()
 
         lifecycleScope.launch {
             loopCheckList(Calendar.getInstance().timeInMillis)
@@ -386,74 +388,6 @@ class PlayerManager(
                 }
             }
         }
-
-        /*checkScheduledMediaJob = lifecycleScope.launch(Dispatchers.Default) {
-
-            val playlist = currentPlaylist
-            val scheduledItems: MutableList<MediaItem> = mutableListOf()
-            scheduledItems.addAll(playlist.filter { it.fixTime.isNotEmpty() && it.fixTime != "00:00:00" })
-
-            while (true)
-            {
-                if (scheduledItems.isEmpty())
-                {
-                    scheduledItems.addAll(playlist.filter { it.fixTime.isNotEmpty() && it.fixTime != "00:00:00" })
-                }
-
-
-                var index = -1
-
-                scheduledItems.forEachIndexed { i, mediaItem ->
-                    try
-                    {
-                        val time = mediaItem.fixTime.split(":").map { it.toInt() }
-
-                        val now = Calendar.getInstance()
-
-                        val scheduledTime = Calendar.getInstance().apply {
-                            set(Calendar.HOUR_OF_DAY, time[0])
-                            set(Calendar.MINUTE, time[1])
-                            set(Calendar.SECOND, time[2])
-                        }
-
-                        val mediaDuration = getDurationInSecond(mediaItem.duration ?: "00:00:00")
-
-                        if (scheduledTime.timeInMillis <= now.timeInMillis
-                                && now.timeInMillis <= scheduledTime.timeInMillis + mediaDuration * 1000
-                        )
-                        {
-                            Log.d(
-                                    "hengio",
-                                    "${now.timeInMillis} - ${scheduledTime.timeInMillis} - ${scheduledTime.timeInMillis + mediaDuration * 1000}"
-                            )
-                            index = i
-                        }
-
-                    } catch (e: NumberFormatException)
-                    {
-                        Log.e("checkScheduledMedia", "error parsing media fixtime")
-                    } catch (e: Exception)
-                    {
-                        Log.e("checkScheduledMedia", "error checking media fixtime")
-                    }
-                }
-
-                if (index != -1 && index < scheduledItems.size)
-                {
-                    withContext(Dispatchers.Main)
-                    {
-                        val indexToPlay = playlist.indexOf(scheduledItems[index])
-
-                        playMediaByIndex(indexToPlay)
-                        Log.d("Scheduled", "play scheduled $indexToPlay")
-                        viewModel.playlistIndex = indexToPlay
-                        scheduledItems.removeAt(index)
-                    }
-                }
-
-                delay(1000)
-            }
-        }*/
     }
 
     fun cancelPlaying() {

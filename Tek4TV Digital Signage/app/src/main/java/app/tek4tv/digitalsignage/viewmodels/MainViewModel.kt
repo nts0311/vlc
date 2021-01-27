@@ -74,8 +74,8 @@ class MainViewModel @ViewModelInject constructor(
         return try
         {
             val audioFolderPath = "${appContext.filesDir.path}${File.separator}$AUDIO_FOLDER_NAME"
-            getAllFileNameInFolder(audioFolderPath)
-                    .map { Uri.parse("file://$audioFolderPath${File.separator}$it") }
+            getAllFileNameInFolder(audioFolderPath).map { Uri.parse("file://$audioFolderPath${File.separator}$it") }
+                .shuffled()
 
         } catch (e: Exception)
         {
