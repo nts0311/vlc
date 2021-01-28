@@ -9,7 +9,6 @@ import app.tek4tv.digitalsignage.repo.PlaylistRepo
 import app.tek4tv.digitalsignage.utils.*
 import com.downloader.Error
 import com.downloader.OnDownloadListener
-import com.downloader.PRDownloader
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -20,6 +19,9 @@ class MediaDownloadManager(
     private val scope: CoroutineScope,
     private val playlistRepo: PlaylistRepo,
 ) {
+
+    private val downloadManager = DownloadManager(scope)
+    private val imageResize = ImageResize()
 
     var broadcastList: List<MediaItem> = listOf()
         set(value) {
@@ -63,7 +65,7 @@ class MediaDownloadManager(
                     Log.d("checkplaylist", needDownload.toString())
                 }
 
-                delay(60000)
+                delay(30000)
             }
         }
     }
@@ -89,7 +91,29 @@ class MediaDownloadManager(
                     var fileName = getFileName(url)
 
                     if (!isFileExisted(storagePath, fileName)) {
-                        PRDownloader.download(url, storagePath, fileName).build()
+                        downloadManager.addToQueue(DownloadItem().apply {
+                            itDownloadUrl = url
+                            itStoragePath = storagePath ?: appContext.filesDir.path!!
+                            itFileName = fileName
+                            downloadListener = object : OnDownloadListener {
+                                override fun onDownloadComplete() {
+                                    it.pathBackup = it.path
+                                    it.path = "$storagePath/$fileName"
+                                    savePlaylist(broadcastList, storagePath)
+                                    Log.d("downloadcomplete", it.path)
+                                    if (it.getMediaType() == MediaType.IMAGE) {
+                                        imageResize.addToQueue(it.path)
+                                        //ImageUtils.resizeImage(it.path)
+                                    }
+                                }
+
+                                override fun onError(error: Error?) {
+                                    Log.d("downloaderror", it.path)
+                                }
+                            }
+                        })
+
+                        /*PRDownloader.download(url, storagePath, fileName).build()
                             .start(object : OnDownloadListener {
                                 override fun onDownloadComplete() {
                                     it.pathBackup = it.path
@@ -104,7 +128,9 @@ class MediaDownloadManager(
                                 override fun onError(error: Error?) {
                                     Log.d("downloaderror", it.path)
                                 }
-                            })
+                            })*/
+
+
                     } else {
                         it.path = "$storagePath/$fileName"
                         savePlaylist(broadcastList, storagePath)
@@ -140,7 +166,23 @@ class MediaDownloadManager(
                 val fileName = getFileName(url)
 
                 if (!isFileExisted(storagePath, fileName)) {
-                    PRDownloader.download(url, storagePath, fileName).build()
+
+                    downloadManager.addToQueue(DownloadItem().apply {
+                        itDownloadUrl = url
+                        itStoragePath = storagePath
+                        itFileName = fileName
+                        downloadListener = object : OnDownloadListener {
+                            override fun onDownloadComplete() {
+                                Log.d("downloadcomplete", "music")
+                            }
+
+                            override fun onError(error: Error?) {
+                                Log.d("downloaderror", "music")
+                            }
+                        }
+                    })
+
+                    /*PRDownloader.download(url, storagePath, fileName).build()
                         .start(object : OnDownloadListener {
                             override fun onDownloadComplete() {
                                 Log.d("downloadcomplete", "music")
@@ -149,7 +191,7 @@ class MediaDownloadManager(
                             override fun onError(error: Error?) {
                                 Log.d("downloaderror", "music")
                             }
-                        })
+                        })*/
                 }
             }
         }

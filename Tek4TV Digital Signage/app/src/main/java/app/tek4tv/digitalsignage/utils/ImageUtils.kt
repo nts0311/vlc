@@ -7,16 +7,15 @@ import java.io.FileOutputStream
 class ImageUtils {
     companion object {
         fun resizeImage(path: String): Boolean {
-            val originalImage = BitmapFactory.decodeFile(path)
+            try {
+                val originalImage = BitmapFactory.decodeFile(path) ?: return false
 
-            var result = false
+                var result = false
 
-            if (originalImage.width > 1920) {
-                val newHeight = originalImage.height * (1920 / originalImage.width.toDouble())
-                val resizedImage =
-                    Bitmap.createScaledBitmap(originalImage, 1920, newHeight.toInt(), true)
-
-                try {
+                if (originalImage.width > 1920) {
+                    val newHeight = originalImage.height * (1920 / originalImage.width.toDouble())
+                    val resizedImage =
+                        Bitmap.createScaledBitmap(originalImage, 1920, newHeight.toInt(), true)
                     val out = FileOutputStream(path)
 
                     val compressFormat = if (path.endsWith("png")) Bitmap.CompressFormat.PNG
@@ -24,13 +23,13 @@ class ImageUtils {
                     result = resizedImage.compress(compressFormat, 100, out)
 
                     out.close()
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                    return false
                 }
-            }
 
-            return result
+                return result
+            } catch (e: Exception) {
+                e.printStackTrace()
+                return false
+            }
         }
     }
 }

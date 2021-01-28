@@ -36,4 +36,6 @@ object Status {
     const val STORAGE_INFO = "STORAGE_INFO"
     const val GET_AUDIO_PATH = "GET_AUDIO_PATH"
     const val GET_MEDIA_PATH = "GET_MEDIA_PATH"
+    const val DELETE_ALL_AUDIO = "DELETE_ALL_AUDIO"
+    const val DELETE_ALL_MEDIA = "DELETE_ALL_MEDIA"
 }

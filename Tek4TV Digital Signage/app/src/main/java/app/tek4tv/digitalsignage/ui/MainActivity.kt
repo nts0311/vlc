@@ -223,7 +223,7 @@ class MainActivity : AppCompatActivity() {
                     }
                     Status.SET_VOLUME -> {
                         if (responseHub.message != null) {
-                            //setVolume(responseHub.message!!)
+                            setVolume(responseHub.message!!)
                         }
                     }
                     Status.STOP -> {
@@ -369,6 +369,14 @@ class MainActivity : AppCompatActivity() {
                             hubManager.sendHubDirectMessage(
                                 connectionId, Utils.GET_MEDIA_PATH, mediaList)
                         }
+                    }
+
+                    Status.DELETE_ALL_AUDIO -> {
+                        appStorageManager.deleteAllMusic()
+                    }
+
+                    Status.DELETE_ALL_MEDIA -> {
+                        appStorageManager.deleteAllMedia()
                     }
                 }
             }

@@ -7,7 +7,7 @@ import android.os.StatFs
 import java.io.File
 
 
-class AppStorageManager(private val appContext: Context) {
+class AppStorageManager(appContext: Context) {
 
     private val fileDirPath = appContext.filesDir.path
     private val audioDirPath = "$fileDirPath${File.separator}$AUDIO_FOLDER_NAME"
@@ -26,6 +26,10 @@ class AppStorageManager(private val appContext: Context) {
 
     fun deleteAllMusic() {
         deleteAllFileInFolder(audioDirPath)
+    }
+
+    fun deleteAllMedia() {
+        deleteAllFileInFolder(fileDirPath)
     }
 
     private fun getTotalStorageInfo(path: String?): Long {
@@ -61,6 +65,7 @@ class AppStorageManager(private val appContext: Context) {
 
     fun getAllMusicPath(): List<String> = getAllFilePathInFolder(audioDirPath)
 
-    fun getAllMediaPath() =
-        getAllFilePathInFolder(fileDirPath).filter { !it.endsWith("playlist.json") && !it.endsWith("log.txt") }
+    fun getAllMediaPath() = getAllFilePathInFolder(fileDirPath).filter {
+        !it.endsWith(PLAYLIST_FILE_NAME) && !it.endsWith("log.txt")
+    }
 }

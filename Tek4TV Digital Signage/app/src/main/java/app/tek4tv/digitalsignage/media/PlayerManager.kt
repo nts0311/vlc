@@ -298,6 +298,9 @@ class PlayerManager(
             val start = toCalendar(t[0])
             val end = toCalendar(t[1])
 
+            if (end.get(Calendar.HOUR_OF_DAY) < start.get(Calendar.HOUR_OF_DAY)) end.add(
+                Calendar.DAY_OF_MONTH, 1)
+
             if (now in start.timeInMillis..end.timeInMillis) {
 
                 if (currentPlaylistKey != period) {
