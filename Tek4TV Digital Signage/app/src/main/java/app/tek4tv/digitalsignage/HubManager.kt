@@ -2,6 +2,7 @@ package app.tek4tv.digitalsignage
 
 import android.app.Activity
 import android.util.Log
+import app.tek4tv.digitalsignage.media.setSystemTime
 import app.tek4tv.digitalsignage.model.DirectMessage
 import app.tek4tv.digitalsignage.model.PingHubRequest
 import app.tek4tv.digitalsignage.model.ReponseHub
@@ -17,6 +18,7 @@ import kotlinx.coroutines.*
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
+import kotlin.math.abs
 
 class HubManager(
     private var lifecycleScope: CoroutineScope,
@@ -38,6 +40,8 @@ class HubManager(
     var responseHub = ReponseHub()
 
     var receivedConnectionId = ""
+
+    val dateformat = SimpleDateFormat("dd/MM/yyyy HH:mm:ss")
 
     fun createNewHubConnection() {
         if (openNewConnectionJob != null && openNewConnectionJob!!.isActive) return
@@ -63,13 +67,13 @@ class HubManager(
 
     private suspend fun openConnection(): String? {
         //open connection on another thread
-        return withContext(Dispatchers.Default)
-        {
+        return withContext(Dispatchers.Default) {
             try {
                 hubConnection!!.start().blockingAwait()
                 hubConnection!!.connectionId
             } catch (e: Exception) {
                 Log.e(LOG_TAG, "error connecting tto hub")
+                e.printStackTrace()
                 null
             }
         }
@@ -87,6 +91,7 @@ class HubManager(
                     when (command) {
                         Status.PONG -> {
                             lastPing = message
+                            syncTimeWithServer(message)
                             Log.d("last ping", lastPing)
                         }
 
@@ -106,10 +111,7 @@ class HubManager(
     fun sendMessage(mess: String, command: String) {
         try {
             hubConnection!!.invoke(
-                command,
-                Utils.getDeviceId(mainActivity.applicationContext),
-                mess
-            )
+                command, Utils.getDeviceId(mainActivity.applicationContext), mess)
         } catch (e: Exception) {
             Log.e(LOG_TAG, e.message)
             e.printStackTrace()
@@ -159,7 +161,6 @@ class HubManager(
                     status = "START"
                     connectionId = (hubConnection!!.connectionId)
                     this.video = videoAdapter.toJson(video)
-                    val dateformat = SimpleDateFormat("dd/MM/yyyy HH:mm:ss")
                     startTine = dateformat.format(Date())
                 }
                 val requestAdapter = moshi.adapter(PingHubRequest::class.java)
@@ -180,7 +181,6 @@ class HubManager(
                 Log.d("pingtimer", "ping")
                 delay(15000)
 
-                val dateformat = SimpleDateFormat("dd/MM/yyyy HH:mm:ss")
                 if (lastPing != "") {
                     try {
 
@@ -192,8 +192,7 @@ class HubManager(
                         if (now.timeInMillis - lastPingTime.timeInMillis > 45000) {
                             Log.e(LOG_TAG, "Losed hub connection")
 
-                            if (hubConnection != null)
-                                hubConnection!!.stop()
+                            if (hubConnection != null) hubConnection!!.stop()
 
                             createNewHubConnection()
                         }
@@ -214,6 +213,20 @@ class HubManager(
             if (message.startsWith("{")) {
                 val jsonAdapter = moshi.adapter(ReponseHub::class.java)
                 responseHub = jsonAdapter.fromJson(message)!!
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    private fun syncTimeWithServer(timeFromServer: String) {
+        try {
+            val time = dateformat.parse(timeFromServer)
+            val now = Date()
+
+            if (abs(time.time - now.time) >= 3000) {
+                setSystemTime(timeFromServer)
+                Log.d("timesync", "sync with server time: $timeFromServer")
             }
         } catch (e: Exception) {
             e.printStackTrace()

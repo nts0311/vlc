@@ -1,9 +1,8 @@
 package app.tek4tv.digitalsignage.media
 
 import android.util.Log
+import java.io.DataOutputStream
 import java.util.*
-
-
 
 
 fun toCalendar(time: String): Calendar {
@@ -34,3 +33,21 @@ fun getDurationInSecond(duration: String): Long {
         0
     }
 }
+
+
+fun setSystemTime(requireTime: String) {
+    try {
+        val process = Runtime.getRuntime().exec("su")
+        val os = DataOutputStream(process.outputStream)
+
+        val t = requireTime.split(" ")
+        val date = t[0].split("/")
+        val time = t[1].split(":")
+
+        val command = "date ${date[1]}${date[0]}${time[0]}${time[1]}${date[2]}.${time[2]} \n"
+        os.writeBytes(command)
+    } catch (e: Exception) {
+        e.printStackTrace()
+    }
+}
+

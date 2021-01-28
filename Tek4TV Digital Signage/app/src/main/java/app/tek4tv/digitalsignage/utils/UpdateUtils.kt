@@ -9,23 +9,25 @@ import android.net.Uri
 import android.os.Environment
 import android.os.StrictMode
 import android.util.Log
+import app.tek4tv.digitalsignage.R
 import java.io.File
 
 fun downloadUpdateApk(url: String, context: Context) {
     var destination: String =
         Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
             .toString() + "/"
-    val fileName = "AppName.apk"
+    val fileName = "GGG.apk"
     destination += fileName
     val uri = Uri.parse("file://$destination")
 
     val file = File(destination)
-    if (file.exists())
-        file.delete()
+    if (file.exists()) file.delete()
+
+    val appname = context.getString(R.string.app_name)
 
     val request = DownloadManager.Request(Uri.parse(url))
-    request.setDescription("update version")
-    request.setTitle("Updating APK...")
+    request.setDescription("Updating $appname")
+    request.setTitle("Updating $appname...")
 
     request.setDestinationUri(uri)
 

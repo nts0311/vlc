@@ -105,7 +105,7 @@ class PlayerManager(
     private fun playMedia(mediaItem: MediaItem) {
         try {
             viewModel.currentMediaItem = mediaItem
-            val media = mediaItem.getVlcMedia(mLibVLC)
+
 
             Log.d("mediaplayed", mediaItem.path)
 
@@ -123,6 +123,7 @@ class PlayerManager(
                         mainPlayer = audioPlayer
                         playMutedVideo(mediaItem)
                     } else {
+                        val media = mediaItem.getVlcMedia(mLibVLC)
                         audioPlayer.stop()
                         media.addOption(":fullscreen")
                         mainPlayer = visualPlayer
@@ -192,7 +193,6 @@ class PlayerManager(
                 }
                 val delayDuration = getMediaDuration(media)
                 visualPlayer.play(media.getVlcMedia(mLibVLC))
-                media.getVlcMedia(mLibVLC).release()
                 Log.d("delay", delayDuration.toString())
                 delay(delayDuration)
             }
@@ -225,6 +225,11 @@ class PlayerManager(
                 mLibVLC, audioList[audioIndex++])
             audioPlayer.play(backgroundAudio)
         } else Log.d("audiox", "no audio")
+    }
+
+    fun playLiveStream() {
+        cancelPlaying()
+
     }
 
 

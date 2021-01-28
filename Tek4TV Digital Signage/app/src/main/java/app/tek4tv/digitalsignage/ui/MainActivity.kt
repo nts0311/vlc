@@ -223,7 +223,7 @@ class MainActivity : AppCompatActivity() {
                     }
                     Status.SET_VOLUME -> {
                         if (responseHub.message != null) {
-                            setVolume(responseHub.message!!)
+                            //setVolume(responseHub.message!!)
                         }
                     }
                     Status.STOP -> {

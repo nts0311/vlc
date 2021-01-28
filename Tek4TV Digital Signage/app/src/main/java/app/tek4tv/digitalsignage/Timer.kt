@@ -7,9 +7,6 @@ class Timer(private val coroutineScope: CoroutineScope) {
     private var tickJob: Job? = null
 
     private var timeListeners = mutableMapOf<Long, suspend (Long) -> Unit>()
-    /*private var secondListeners = mutableMapOf<String, suspend (Long) -> Unit>()
-    private var minuteListeners = mutableMapOf<String, suspend (Long) -> Unit>()
-    private var hourListeners = mutableMapOf<String, suspend (Long) -> Unit>()*/
 
     private var before = Calendar.getInstance()
 
@@ -31,29 +28,6 @@ class Timer(private val coroutineScope: CoroutineScope) {
             }
         }
     }
-
-    /*private suspend fun onTimeChanged(now: Calendar)
-    {
-        timeListeners.forEach { it.value.invoke(now.timeInMillis) }
-
-
-        val hourBefore = before.get(Calendar.HOUR_OF_DAY)
-        val minuteBefore = before.get(Calendar.MINUTE)
-        val secondBefore = before.get(Calendar.SECOND)
-
-        val hourNow = now.get(Calendar.HOUR_OF_DAY)
-        val minuteNow = now.get(Calendar.MINUTE)
-        val secondNow = now.get(Calendar.SECOND)
-
-        if (secondNow != secondBefore)
-            secondListeners.forEach { it.value.invoke(now.timeInMillis) }
-
-        if (minuteNow != minuteBefore)
-            minuteListeners.forEach { it.value.invoke(now.timeInMillis) }
-
-        if (hourNow != hourBefore)
-            hourListeners.forEach { it.value.invoke(now.timeInMillis) }
-    }*/
 
     fun stop()
     {

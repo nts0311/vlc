@@ -6,6 +6,14 @@ plugins {
 }
 
 android {
+    signingConfigs {
+        release {
+            storeFile file('C:\\Users\\xxxx9\\Documents\\GitHub\\vlc\\Tek4TV Digital Signage\\keystore.jks')
+            storePassword '123456789'
+            keyAlias 'key0'
+            keyPassword '123456789'
+        }
+    }
     compileSdkVersion 28
     buildToolsVersion "30.0.2"
 
@@ -29,6 +37,7 @@ android {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            signingConfig signingConfigs.release
         }
     }
     compileOptions {
@@ -87,7 +96,4 @@ dependencies {
 
     //prdownloader
     implementation 'com.mindorks.android:prdownloader:0.6.0'
-
-
-    debugImplementation 'com.squareup.leakcanary:leakcanary-android:2.6'
 }
