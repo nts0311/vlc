@@ -196,9 +196,9 @@ class MainActivity : AppCompatActivity() {
                     Status.PREVIEW -> {
                     }
                     Status.JUMP -> {
-                        Log.d(command, message)
+                        /* Log.d(command, message)
                         val id = responseHub.message!!.trim().toInt()
-                        playMediaItemByIndex(id)
+                        playMediaItemByIndex(id)*/
                     }
                     Status.LIVE -> {
 

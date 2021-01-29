@@ -3,10 +3,13 @@ package app.tek4tv.digitalsignage.utils
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.util.Log
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import java.io.FileOutputStream
 import java.util.*
 
-class ImageResize {
+class ImageResize(private val scope: CoroutineScope) {
 
     private val imageQueue: Queue<String> = LinkedList()
     private val addedItem = mutableMapOf<String, Boolean>()
@@ -39,16 +42,30 @@ class ImageResize {
 
             if (size.outWidth <= 1920) return
 
-            val reqWidth = 1920
-            val reqHeight = size.outHeight * (1920 / size.outWidth.toDouble())
+            var reqWidth: Double
+            var reqHeight: Double
 
-            val sampleSize = calculateInSampleSize(size, reqWidth, reqHeight.toInt())
+            if (size.outWidth > size.outHeight) {
+                reqWidth = 1920.0
+                reqHeight = size.outHeight * (1920 / size.outWidth.toDouble())
+            } else {
+                reqHeight = 1080.0
+                reqWidth = size.outWidth * (1080 / size.outHeight.toDouble())
+            }
 
-            var resizedBitmap = if (sampleSize > 1) decodeSampledBitMap(path, sampleSize)
-            else resizeManually(path, reqWidth, reqHeight.toInt())
+            /*val reqWidth1 = 1920
+            val reqHeight1 = size.outHeight * (1920 / size.outWidth.toDouble())*/
 
-            if (resizedBitmap != null && resizedBitmap.width > 1920) resizedBitmap =
-                Bitmap.createScaledBitmap(resizedBitmap, reqWidth, reqHeight.toInt(), true)
+            val sampleSize = calculateInSampleSize(size, reqWidth.toInt(), reqHeight.toInt())
+
+            var resizedBitmap = decodeSampledBitMap(
+                path, sampleSize, size.outWidth, reqWidth.toInt())//if (sampleSize > 1) decodeSampledBitMap(path, sampleSize)
+            //else resizeManually(path, reqWidth.toInt(), reqHeight.toInt())
+
+            /*if (resizedBitmap != null
+                && (resizedBitmap.width != reqWidth.toInt() || resizedBitmap.height != reqHeight.toInt()))
+                    resizedBitmap =
+                Bitmap.createScaledBitmap(resizedBitmap, reqWidth.toInt(), reqHeight.toInt(), true)*/
 
             if (resizedBitmap != null) saveBitmap(resizedBitmap, path)
 
@@ -58,20 +75,7 @@ class ImageResize {
         }
     }
 
-    fun getImageSize(path: String): BitmapFactory.Options? {
-        return try {
-            val options = BitmapFactory.Options().apply {
-                inJustDecodeBounds = true
-            }
 
-            BitmapFactory.decodeFile(path, options)
-
-            options
-        } catch (e: Exception) {
-            e.printStackTrace()
-            null
-        }
-    }
 
     fun calculateInSampleSize(options: BitmapFactory.Options, reqWidth: Int, reqHeight: Int): Int {
         // Raw height and width of image
@@ -93,9 +97,12 @@ class ImageResize {
         return inSampleSize
     }
 
-    fun decodeSampledBitMap(path: String, sampleSize: Int): Bitmap {
+    fun decodeSampledBitMap(path: String, sampleSize: Int, srcWidth: Int, reqWidth: Int): Bitmap {
         return BitmapFactory.Options().run {
+            inScaled = true
             inSampleSize = sampleSize
+            inDensity = srcWidth
+            inTargetDensity = reqWidth * sampleSize
             BitmapFactory.decodeFile(path, this)
         }
     }
@@ -114,14 +121,16 @@ class ImageResize {
     }
 
     fun saveBitmap(bitmap: Bitmap, path: String) {
-        try {
-            val out = FileOutputStream(path)
-            val compressFormat = if (path.endsWith("png")) Bitmap.CompressFormat.PNG
-            else Bitmap.CompressFormat.JPEG
-            bitmap.compress(compressFormat, 100, out)
-            out.close()
-        } catch (e: Exception) {
-            e.printStackTrace()
+        scope.launch(Dispatchers.IO) {
+            try {
+                val out = FileOutputStream(path)
+                val compressFormat = if (path.endsWith("png")) Bitmap.CompressFormat.PNG
+                else Bitmap.CompressFormat.JPEG
+                bitmap.compress(compressFormat, 100, out)
+                out.close()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
     }
 
@@ -134,5 +143,22 @@ class ImageResize {
         imageQueue.add(path)
 
         if (!isReSizing) startResize()
+    }
+
+    companion object {
+        fun getImageSize(path: String): BitmapFactory.Options? {
+            return try {
+                val options = BitmapFactory.Options().apply {
+                    inJustDecodeBounds = true
+                }
+
+                BitmapFactory.decodeFile(path, options)
+
+                options
+            } catch (e: Exception) {
+                e.printStackTrace()
+                null
+            }
+        }
     }
 }

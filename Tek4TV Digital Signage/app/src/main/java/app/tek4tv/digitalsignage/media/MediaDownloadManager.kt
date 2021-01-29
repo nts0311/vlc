@@ -21,7 +21,7 @@ class MediaDownloadManager(
 ) {
 
     private val downloadManager = DownloadManager(scope)
-    private val imageResize = ImageResize()
+    private val imageResize = ImageResize(scope)
 
     var broadcastList: List<MediaItem> = listOf()
         set(value) {

@@ -46,7 +46,12 @@ fun setSystemTime(requireTime: String) {
 
         val command = "date ${date[1]}${date[0]}${time[0]}${time[1]}${date[2]}.${time[2]} \n"
         os.writeBytes(command)
+        os.flush()
+        os.writeBytes("exit\n")
+        os.flush()
+        process.waitFor()
     } catch (e: Exception) {
+        Log.e("timesync", e.message ?: "")
         e.printStackTrace()
     }
 }
