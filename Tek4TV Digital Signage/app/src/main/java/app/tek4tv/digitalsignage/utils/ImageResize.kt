@@ -15,7 +15,6 @@ class ImageResize(private val scope: CoroutineScope) {
     private val addedItem = mutableMapOf<String, Boolean>()
     private var isReSizing = false
 
-
     fun startResize() {
         Log.d("resize", "Strt")
         isReSizing = true
@@ -42,8 +41,8 @@ class ImageResize(private val scope: CoroutineScope) {
 
             if (size.outWidth <= 1920) return
 
-            var reqWidth: Double
-            var reqHeight: Double
+            val reqWidth: Double
+            val reqHeight: Double
 
             if (size.outWidth > size.outHeight) {
                 reqWidth = 1920.0
@@ -53,19 +52,11 @@ class ImageResize(private val scope: CoroutineScope) {
                 reqWidth = size.outWidth * (1080 / size.outHeight.toDouble())
             }
 
-            /*val reqWidth1 = 1920
-            val reqHeight1 = size.outHeight * (1920 / size.outWidth.toDouble())*/
 
             val sampleSize = calculateInSampleSize(size, reqWidth.toInt(), reqHeight.toInt())
 
-            var resizedBitmap = decodeSampledBitMap(
-                path, sampleSize, size.outWidth, reqWidth.toInt())//if (sampleSize > 1) decodeSampledBitMap(path, sampleSize)
-            //else resizeManually(path, reqWidth.toInt(), reqHeight.toInt())
-
-            /*if (resizedBitmap != null
-                && (resizedBitmap.width != reqWidth.toInt() || resizedBitmap.height != reqHeight.toInt()))
-                    resizedBitmap =
-                Bitmap.createScaledBitmap(resizedBitmap, reqWidth.toInt(), reqHeight.toInt(), true)*/
+            val resizedBitmap = decodeSampledBitMap(
+                path, sampleSize, size.outWidth, reqWidth.toInt())
 
             if (resizedBitmap != null) saveBitmap(resizedBitmap, path)
 
@@ -104,19 +95,6 @@ class ImageResize(private val scope: CoroutineScope) {
             inDensity = srcWidth
             inTargetDensity = reqWidth * sampleSize
             BitmapFactory.decodeFile(path, this)
-        }
-    }
-
-    fun resizeManually(path: String, reqWidth: Int, reqHeight: Int): Bitmap? {
-        try {
-            val originalImage = BitmapFactory.decodeFile(path)
-            if (originalImage != null) {
-                return Bitmap.createScaledBitmap(originalImage, reqWidth, reqHeight, true)
-            }
-
-            return null
-        } catch (e: Exception) {
-            return null
         }
     }
 
