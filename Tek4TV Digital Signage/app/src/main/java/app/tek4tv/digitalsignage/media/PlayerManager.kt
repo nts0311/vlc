@@ -147,6 +147,7 @@ class PlayerManager(
 
     private fun playMutedVideo(videoItem: MediaItem) {
         val video = videoItem.getVlcMedia(mLibVLC)
+        video.addOption(":no-audio")
         visualPlayer.media = video
         visualPlayer.play()
 

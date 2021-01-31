@@ -222,9 +222,9 @@ class MainActivity : AppCompatActivity() {
                         } else Log.d("location", "location not found")
                     }
                     Status.SET_VOLUME -> {
-                        if (responseHub.message != null) {
+                        /*if (responseHub.message != null) {
                             setVolume(responseHub.message!!)
-                        }
+                        }*/
                     }
                     Status.STOP -> {
                     }
@@ -378,6 +378,14 @@ class MainActivity : AppCompatActivity() {
                     Status.DELETE_ALL_MEDIA -> {
                         appStorageManager.deleteAllMedia()
                     }
+
+                    Status.SET_MUTE_PLAYER -> {
+                        val isMute = responseHub.message
+                        if (isMute != null) {
+                            if (isMute == "1") setVolume(0)
+                            else if (isMute == "0") setVolume(100)
+                        }
+                    }
                 }
             }
         } catch (e: java.lang.Exception) {
@@ -400,17 +408,16 @@ class MainActivity : AppCompatActivity() {
             AudioManager.STREAM_MUSIC, direction, AudioManager.FLAG_SHOW_UI)
     }
 
-    private fun setVolume(message: String) {
-        var volume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
-        var maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
-
+    private fun setVolume(volumeToSet: Int) {
         try {
-            volume = ((maxVolume.toFloat() / 100) * message.toInt()).toInt()
-        } catch (e: NumberFormatException) {
+            val maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+            val volume = ((maxVolume.toFloat() / 100) * volumeToSet).toInt()
+
+            audioManager.setStreamVolume(
+                AudioManager.STREAM_MUSIC, volume, AudioManager.FLAG_SHOW_UI)
+        } catch (e: Exception) {
 
         }
-
-        audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, volume, AudioManager.FLAG_SHOW_UI)
     }
 }
 

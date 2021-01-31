@@ -1,6 +1,7 @@
 package app.tek4tv.digitalsignage.utils
 
 object Status {
+    const val SET_MUTE_PLAYER = "SET_MUTE_PLAYER"
     const val GET_LIST = "GET_LIST"
     const val UPDATE_LIST = "UPDATE_LIST"
     const val NEXT = "NEXT"

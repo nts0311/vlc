@@ -6,8 +6,6 @@ class CustomPlayer(libVlc: LibVLC) : MediaPlayer(libVlc)
 {
     var eventListener: (Int) -> Unit = {}
 
-    var type = ""
-
     override fun onEventNative(
             eventType: Int,
             arg1: Long,
