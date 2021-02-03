@@ -14,6 +14,7 @@ import androidx.lifecycle.lifecycleScope
 import app.tek4tv.digitalsignage.*
 import app.tek4tv.digitalsignage.media.PlayerManager
 import app.tek4tv.digitalsignage.model.*
+import app.tek4tv.digitalsignage.network.PlaylistService
 import app.tek4tv.digitalsignage.utils.*
 import app.tek4tv.digitalsignage.viewmodels.MainViewModel
 import com.squareup.moshi.Moshi
@@ -54,6 +55,9 @@ class MainActivity : AppCompatActivity() {
 
     @Inject
     lateinit var moshi: Moshi
+
+    @Inject
+    lateinit var playlistService: PlaylistService
 
     private lateinit var hubManager: HubManager
     private lateinit var playerManager: PlayerManager
@@ -102,6 +106,8 @@ class MainActivity : AppCompatActivity() {
         registerObservers()
 
         appStorageManager = AppStorageManager(applicationContext)
+
+
     }
 
     override fun onStop() {
@@ -385,6 +391,10 @@ class MainActivity : AppCompatActivity() {
                             if (isMute == "1") setVolume(0)
                             else if (isMute == "0") setVolume(100)
                         }
+                    }
+
+                    Status.CAPTURE_SCREEN -> {
+                        playerManager.captureScreen(playlistService)
                     }
                 }
             }

@@ -1,11 +1,20 @@
 package app.tek4tv.digitalsignage.media
 
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.Matrix
 import android.net.Uri
+import android.util.Base64
 import android.util.Log
+import android.view.TextureView
+import android.widget.FrameLayout
+import androidx.core.view.children
+import androidx.lifecycle.LiveData
+import androidx.lifecycle.MutableLiveData
 import app.tek4tv.digitalsignage.Timer
 import app.tek4tv.digitalsignage.model.MediaItem
 import app.tek4tv.digitalsignage.model.MediaType
+import app.tek4tv.digitalsignage.network.PlaylistService
 import app.tek4tv.digitalsignage.repo.PlaylistRepo
 import app.tek4tv.digitalsignage.ui.CustomPlayer
 import app.tek4tv.digitalsignage.viewmodels.MainViewModel
@@ -14,6 +23,7 @@ import org.videolan.libvlc.LibVLC
 import org.videolan.libvlc.Media
 import org.videolan.libvlc.MediaPlayer
 import org.videolan.libvlc.util.VLCVideoLayout
+import java.io.ByteArrayOutputStream
 import java.util.*
 
 class PlayerManager(
@@ -80,12 +90,8 @@ class PlayerManager(
     }
 
     fun attachVisualPlayerView() {
-        if (rotationMode == 0) {
-            visualPlayer.attachViews(mVideoLayout, null, true, false)
-        } else {
-            mVideoLayout.rotation = 180.0f
-            visualPlayer.attachViews(mVideoLayout, null, true, true)
-        }
+        visualPlayer.attachViews(mVideoLayout, null, false, true)
+        if (rotationMode != 0) mVideoLayout.rotation = 180f
     }
 
     fun playMediaByIndex(index: Int) {
@@ -221,16 +227,22 @@ class PlayerManager(
                 audioList = audioList.shuffled()
             }
 
-            Log.d("audiox", audioIndex.toString())
+            val audioItem = audioList[audioIndex++]
+
             val backgroundAudio = Media(
-                mLibVLC, audioList[audioIndex++])
+                mLibVLC, audioItem)
+
+
+            val audioName = audioItem.toString()
+            viewModel.currentAudioName = audioName.substring(audioName.lastIndexOf('/') + 1)
+
+            Log.d("audiox", audioItem.toString())
             audioPlayer.play(backgroundAudio)
         } else Log.d("audiox", "no audio")
     }
 
     fun playLiveStream() {
         cancelPlaying()
-
     }
 
 
@@ -283,7 +295,6 @@ class PlayerManager(
 
         checkScheduledMediaListId =
             checkScheduledListTimer.addTimeListener(Dispatchers.Default) { now ->
-                Log.d("checklist", "check")
                 loopCheckList(now)
             }
     }
@@ -432,5 +443,58 @@ class PlayerManager(
         if (!visualPlayer.isReleased) visualPlayer.release()
 
         mLibVLC.release()
+    }
+
+    fun captureScreen(service: PlaylistService): LiveData<ByteArray?> {
+        val result = MutableLiveData<ByteArray>()
+        lifecycleScope.launch(Dispatchers.Default) {
+            try {
+                val tv: TextureView =
+                    (mVideoLayout.getChildAt(0) as FrameLayout).children.filter { it is TextureView }
+                        .first() as TextureView
+
+
+                val bitmap = getResizedBitmap(tv.bitmap, 640, 360)
+
+                val bs = ByteArrayOutputStream()
+                bitmap.compress(Bitmap.CompressFormat.JPEG, 100, bs)
+                val res = bs.toByteArray()
+
+                val str = Base64.encodeToString(res, Base64.DEFAULT)
+
+                val body = mapOf(
+                    "Data" to str,
+                    "Imei" to app.tek4tv.digitalsignage.utils.Utils.getDeviceId(applicationContext),
+                    "Extension" to ".jpg")
+
+                val ok = service.postScreenshot(body)
+
+                Log.d("capture", ok.toString())
+
+            } catch (e: Exception) {
+                result.postValue(null)
+                Log.e("capture", e.message ?: "")
+                e.printStackTrace()
+            }
+        }
+
+        return result
+    }
+
+    fun getResizedBitmap(bm: Bitmap, newWidth: Int, newHeight: Int): Bitmap {
+        val width = bm.width
+        val height = bm.height
+        val scaleWidth = newWidth.toFloat() / width
+        val scaleHeight = newHeight.toFloat() / height
+        // CREATE A MATRIX FOR THE MANIPULATION
+        val matrix = Matrix()
+        // RESIZE THE BIT MAP
+        matrix.postScale(scaleWidth, scaleHeight)
+
+        // "RECREATE" THE NEW BITMAP
+        val resizedBitmap = Bitmap.createBitmap(
+            bm, 0, 0, width, height, matrix, false)
+        bm.recycle()
+        return resizedBitmap
     }
 }

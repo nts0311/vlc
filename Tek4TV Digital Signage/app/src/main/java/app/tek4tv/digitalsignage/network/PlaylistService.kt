@@ -12,4 +12,8 @@ interface PlaylistService {
 
     @GET
     suspend fun getAudioList(@Url url: String): Response<List<String>>
+
+    @Headers("Content-Type: application/json")
+    @POST("api/device/image/save")
+    suspend fun postScreenshot(@Body body: Map<String, String>): Response<Boolean>
 }

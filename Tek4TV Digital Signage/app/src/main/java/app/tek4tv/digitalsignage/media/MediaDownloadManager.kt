@@ -9,10 +9,7 @@ import app.tek4tv.digitalsignage.repo.PlaylistRepo
 import app.tek4tv.digitalsignage.utils.*
 import com.downloader.Error
 import com.downloader.OnDownloadListener
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.*
 import java.io.File
 
 class MediaDownloadManager(
@@ -20,8 +17,10 @@ class MediaDownloadManager(
     private val playlistRepo: PlaylistRepo,
 ) {
 
-    private val downloadManager = DownloadManager(scope)
+    //private val downloadManager = DownloadManager(scope)
     private val imageResize = ImageResize(scope)
+
+    private val downloadHelper = DownloadHelper(scope)
 
     var broadcastList: List<MediaItem> = listOf()
         set(value) {
@@ -47,8 +46,7 @@ class MediaDownloadManager(
                     playlist.forEach {
                         val mediaPath = it.path
                         if (mediaPath.isNotEmpty() && !File(mediaPath).exists()) {
-                            if (it.pathBackup.startsWith("http"))
-                                it.path = it.pathBackup
+                            if (it.pathBackup.startsWith("http")) it.path = it.pathBackup
                             foundBrokenPath = true
                         }
                     }
@@ -59,8 +57,7 @@ class MediaDownloadManager(
                         it.path.startsWith("http") || it.path.isEmpty()
                     }
 
-                    if (needDownload)
-                        downloadMedias(appContext)
+                    if (needDownload) downloadMedias(appContext)
 
                     Log.d("checkplaylist", needDownload.toString())
                 }
@@ -74,67 +71,45 @@ class MediaDownloadManager(
     fun downloadMedias(appContext: Context) {
         scope.launch {
             downloadMediaJob?.join()
-            downloadMediaJob = launch {
+            downloadMediaJob = launch(Dispatchers.Default) {
                 startDownloadMedia(appContext)
             }
         }
     }
 
-    private fun startDownloadMedia(appContext: Context) {
+    private suspend fun startDownloadMedia(appContext: Context) {
+        if (playlist.isNullOrEmpty()) return
         val storagePath = appContext.filesDir.path
-        if (!playlist.isNullOrEmpty()) {
 
-            playlist.forEach {
-                val url = it.path
+        playlist.forEach {
+            val url = it.path
+            if (!url.isEmpty() && url.startsWith("http")) {
+                val fileName = getFileName(url)
+                if (!isFileExisted(storagePath, fileName)) {
+                    downloadHelper.addToQueue(DownloadItem().apply {
+                        itDownloadUrl = url
+                        itStoragePath = storagePath ?: appContext.filesDir.path!!
+                        itFileName = fileName
+                        downloadListener = object : OnDownloadListener {
+                            override fun onDownloadComplete() {
+                                it.pathBackup = it.path
+                                it.path = "$storagePath/$fileName"
+                                savePlaylist(broadcastList, storagePath)
+                                Log.d("downloadcomplete", it.path)
 
-                if (!url.isEmpty() && url.startsWith("http")) {
-                    var fileName = getFileName(url)
-
-                    if (!isFileExisted(storagePath, fileName)) {
-                        downloadManager.addToQueue(DownloadItem().apply {
-                            itDownloadUrl = url
-                            itStoragePath = storagePath ?: appContext.filesDir.path!!
-                            itFileName = fileName
-                            downloadListener = object : OnDownloadListener {
-                                override fun onDownloadComplete() {
-                                    it.pathBackup = it.path
-                                    it.path = "$storagePath/$fileName"
-                                    savePlaylist(broadcastList, storagePath)
-                                    Log.d("downloadcomplete", it.path)
-                                    if (it.getMediaType() == MediaType.IMAGE) {
-                                        imageResize.addToQueue(it.path)
-                                        //ImageUtils.resizeImage(it.path)
-                                    }
-                                }
-
-                                override fun onError(error: Error?) {
-                                    Log.d("downloaderror", it.path)
+                                if (it.getMediaType() == MediaType.IMAGE) {
+                                    imageResize.addToQueue(it.path)
                                 }
                             }
-                        })
 
-                        /*PRDownloader.download(url, storagePath, fileName).build()
-                            .start(object : OnDownloadListener {
-                                override fun onDownloadComplete() {
-                                    it.pathBackup = it.path
-                                    it.path = "$storagePath/$fileName"
-                                    savePlaylist(broadcastList, storagePath)
-                                    Log.d("downloadcomplete", it.path)
-                                    if (it.getMediaType() == MediaType.IMAGE) {
-                                        ImageUtils.resizeImage(it.path)
-                                    }
-                                }
-
-                                override fun onError(error: Error?) {
-                                    Log.d("downloaderror", it.path)
-                                }
-                            })*/
-
-
-                    } else {
-                        it.path = "$storagePath/$fileName"
-                        savePlaylist(broadcastList, storagePath)
-                    }
+                            override fun onError(error: Error?) {
+                                Log.d("downloaderror", it.path)
+                            }
+                        }
+                    })
+                } else {
+                    it.path = "$storagePath/$fileName"
+                    savePlaylist(broadcastList, storagePath)
                 }
             }
         }
@@ -145,9 +120,7 @@ class MediaDownloadManager(
             saveFileJob?.join()
             saveFileJob = launch {
                 playlistRepo.savePlaylistToFile(
-                    broadcastList,
-                    storagePath
-                )
+                    broadcastList, storagePath)
             }
         }
     }
@@ -155,11 +128,9 @@ class MediaDownloadManager(
 
     fun downloadAudio(appContext: Context, paths: List<String>) {
         val storagePath = "${appContext.filesDir.path}${File.separator}$AUDIO_FOLDER_NAME"
-        if (!isFolderExisted(storagePath))
-            createFolder(storagePath)
+        if (!isFolderExisted(storagePath)) createFolder(storagePath)
 
         if (paths.isEmpty()) return
-
 
         paths.forEach { url ->
             if (url.isNotEmpty() && url.startsWith("http")) {
@@ -167,31 +138,22 @@ class MediaDownloadManager(
 
                 if (!isFileExisted(storagePath, fileName)) {
 
-                    downloadManager.addToQueue(DownloadItem().apply {
-                        itDownloadUrl = url
-                        itStoragePath = storagePath
-                        itFileName = fileName
-                        downloadListener = object : OnDownloadListener {
-                            override fun onDownloadComplete() {
-                                Log.d("downloadcomplete", "music")
-                            }
+                    scope.launch {
+                        downloadHelper.addToQueue(DownloadItem().apply {
+                            itDownloadUrl = url
+                            itStoragePath = storagePath
+                            itFileName = fileName
+                            downloadListener = object : OnDownloadListener {
+                                override fun onDownloadComplete() {
+                                    Log.d("downloadcomplete", url)
+                                }
 
-                            override fun onError(error: Error?) {
-                                Log.d("downloaderror", "music")
+                                override fun onError(error: Error?) {
+                                    Log.d("downloaderror", url)
+                                }
                             }
-                        }
-                    })
-
-                    /*PRDownloader.download(url, storagePath, fileName).build()
-                        .start(object : OnDownloadListener {
-                            override fun onDownloadComplete() {
-                                Log.d("downloadcomplete", "music")
-                            }
-
-                            override fun onError(error: Error?) {
-                                Log.d("downloaderror", "music")
-                            }
-                        })*/
+                        })
+                    }
                 }
             }
         }

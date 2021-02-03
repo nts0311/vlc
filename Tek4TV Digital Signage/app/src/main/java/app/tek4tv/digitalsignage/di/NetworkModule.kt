@@ -13,6 +13,7 @@ import retrofit2.Retrofit
 import retrofit2.converter.moshi.MoshiConverterFactory
 import javax.inject.Singleton
 
+
 @Module
 @InstallIn(ApplicationComponent::class)
 object NetworkModule {

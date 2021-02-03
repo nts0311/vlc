@@ -18,5 +18,4 @@ class CustomPlayer(libVlc: LibVLC) : MediaPlayer(libVlc)
         eventListener.invoke(eventType)
         return res
     }
-
 }

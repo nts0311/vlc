@@ -22,7 +22,7 @@ class CrashHandler(private val activity: Activity) : Thread.UncaughtExceptionHan
         if (appInstance != null) {
             //logToFile(thread, ex)
 
-            restartApp(appInstance, activity)
+            //restartApp(appInstance, activity)
         }
     }
 

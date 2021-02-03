@@ -146,13 +146,18 @@ class HubManager(
 
                 var mode = "-1"
 
-                if (viewModel.currentMediaItem != null) {
-                    val path = viewModel.currentMediaItem!!.path
+                val curMediaItem = viewModel.currentMediaItem
+
+                if (curMediaItem != null) {
+                    val path = curMediaItem.path
                     mode = if (path.isNotEmpty() && !File(path).exists()) "1"
                     else "0"
                 }
 
-                val video = Video("" + i, mode)
+                val video = Video("" + i, mode).apply {
+                    if (curMediaItem != null) mediaName = curMediaItem.name ?: ""
+                    audioName = viewModel.currentAudioName
+                }
 
                 val videoAdapter = moshi.adapter(Video::class.java)
 

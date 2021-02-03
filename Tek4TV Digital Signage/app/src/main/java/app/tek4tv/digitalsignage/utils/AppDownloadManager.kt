@@ -19,10 +19,6 @@ class DownloadManager(private val scope: CoroutineScope) {
     private var isDownloading = false
     private var downloadJob: Job? = null
 
-    init {
-
-    }
-
     fun startDownload() {
         isDownloading = true
         scope.launch {
@@ -67,10 +63,9 @@ class DownloadManager(private val scope: CoroutineScope) {
                         if (itemCount.value <= 0) {
                             cont.resume(null)
                         }
-
                         addedItem[it.itDownloadUrl] = false
 
-                        it.downloadListener.onDownloadComplete()
+                        it.downloadListener?.onDownloadComplete()
                     }
 
                     override fun onError(error: Error?) {
@@ -82,7 +77,7 @@ class DownloadManager(private val scope: CoroutineScope) {
                             cont.resume(null)
                         }
 
-                        it.downloadListener.onError(error)
+                        it.downloadListener?.onError(error)
                     }
                 })
         }
@@ -103,15 +98,7 @@ class DownloadItem {
     var itDownloadUrl = ""
     var itStoragePath = ""
     var itFileName = ""
-    var downloadListener = object : OnDownloadListener {
-        override fun onDownloadComplete() {
-
-        }
-
-        override fun onError(error: Error?) {
-
-        }
-    }
+    var downloadListener: OnDownloadListener? = null
 }
 
 class Counter(var value: Int = 0)

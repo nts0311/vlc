@@ -36,6 +36,8 @@ class MainViewModel @ViewModelInject constructor(
 
     var currentMediaItem: MediaItem? = null
 
+    var currentAudioName = ""
+
 
     fun getPlaylist(context: Context, needUpdate: Boolean) {
         if (getPlaylistJob != null) return
