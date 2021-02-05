@@ -20,7 +20,7 @@ class CrashHandler(private val activity: Activity) : Thread.UncaughtExceptionHan
 
         // TODO : add crash handler to app when building for customer
         if (appInstance != null) {
-            //logToFile(thread, ex)
+            logToFile(thread, ex)
 
             //restartApp(appInstance, activity)
         }

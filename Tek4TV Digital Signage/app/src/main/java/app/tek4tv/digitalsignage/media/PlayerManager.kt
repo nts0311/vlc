@@ -69,11 +69,14 @@ class PlayerManager(
 
     init {
         val args = ArrayList<String>()
-        args.add("-vvv")
+        //args.add("-vvv")
+        args.add("--file-caching=8000")
         args.add("--aout=opensles")
-        args.add("--avcodec-codec=h264")
-        args.add("--network-caching=2000")
+        args.add("--avcodec-hw=any")
+        args.add("--network-caching=5000")
         args.add("--no-http-reconnect")
+        args.add("--disc-caching=8000")
+        args.add("--sout-mux-caching=8000")
 
         timer = Timer(lifecycleScope)
         timer.start()
@@ -91,7 +94,6 @@ class PlayerManager(
 
     fun attachVisualPlayerView() {
         visualPlayer.attachViews(mVideoLayout, null, false, true)
-        if (rotationMode != 0) mVideoLayout.rotation = 180f
     }
 
     fun playMediaByIndex(index: Int) {
@@ -112,9 +114,6 @@ class PlayerManager(
         try {
             viewModel.currentMediaItem = mediaItem
 
-
-            Log.d("mediaplayed", mediaItem.path)
-
             presentImageJob?.cancel()
 
             mainPlayer?.eventListener = {}
@@ -123,21 +122,17 @@ class PlayerManager(
 
             when (mediaItem.getMediaType()) {
                 MediaType.VIDEO -> {
-                    Log.d("mediaplayed", "video")
-
                     if (mediaItem.muted) {
                         mainPlayer = audioPlayer
                         playMutedVideo(mediaItem)
                     } else {
                         val media = mediaItem.getVlcMedia(mLibVLC)
                         audioPlayer.stop()
-                        media.addOption(":fullscreen")
                         mainPlayer = visualPlayer
                         visualPlayer.play(media)
                     }
                 }
                 MediaType.IMAGE -> {
-                    Log.d("mediaplayed", "audio")
                     presentImage(mediaItem)
                     mainPlayer = audioPlayer
                 }
@@ -152,11 +147,11 @@ class PlayerManager(
     }
 
     private fun playMutedVideo(videoItem: MediaItem) {
-        val video = videoItem.getVlcMedia(mLibVLC)
+        val video: Media = videoItem.getVlcMedia(mLibVLC)
         video.addOption(":no-audio")
+        video.addOption(":fullscreen")
         visualPlayer.media = video
         visualPlayer.play()
-
 
         visualPlayer.eventListener = { event ->
             when (event) {
@@ -445,7 +440,7 @@ class PlayerManager(
         mLibVLC.release()
     }
 
-    fun captureScreen(service: PlaylistService): LiveData<ByteArray?> {
+    fun captureScreen(service: PlaylistService, isPortrait: Boolean): LiveData<ByteArray?> {
         val result = MutableLiveData<ByteArray>()
         lifecycleScope.launch(Dispatchers.Default) {
             try {
@@ -454,22 +449,23 @@ class PlayerManager(
                         .first() as TextureView
 
 
-                val bitmap = getResizedBitmap(tv.bitmap, 640, 360)
+                val base64Img = withContext(Dispatchers.Default) {
+                    val bitmap = if (!isPortrait) getResizedBitmap(tv.bitmap, 640, 360)
+                    else getResizedBitmap(tv.bitmap, 360, 640)
+                    val bs = ByteArrayOutputStream()
+                    bitmap.compress(Bitmap.CompressFormat.JPEG, 100, bs)
+                    Base64.encodeToString(bs.toByteArray(), Base64.DEFAULT)
+                }
 
-                val bs = ByteArrayOutputStream()
-                bitmap.compress(Bitmap.CompressFormat.JPEG, 100, bs)
-                val res = bs.toByteArray()
-
-                val str = Base64.encodeToString(res, Base64.DEFAULT)
 
                 val body = mapOf(
-                    "Data" to str,
+                    "Data" to base64Img,
                     "Imei" to app.tek4tv.digitalsignage.utils.Utils.getDeviceId(applicationContext),
                     "Extension" to ".jpg")
 
-                val ok = service.postScreenshot(body)
-
-                Log.d("capture", ok.toString())
+                withContext(Dispatchers.IO) {
+                    service.postScreenshot(body)
+                }
 
             } catch (e: Exception) {
                 result.postValue(null)

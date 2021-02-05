@@ -74,14 +74,31 @@ class MainActivity : AppCompatActivity() {
 
     private var locationTracker = LocationTracker()
 
+    private lateinit var rotateLayout: com.github.rongi.rotate_layout.layout.RotateLayout
+    private var orientation: Int = 0
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
         Thread.setDefaultUncaughtExceptionHandler(CrashHandler(this))
 
+        rotateLayout = findViewById(R.id.main_root)
+
         preference = getPreferences(MODE_PRIVATE)
+        orientation = preference.getInt(PREF_ORIENTATION, 0)
+        /*if(orientation == 0 || orientation == 1)
+            requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+        else
+            requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT*/
+
         requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+        rotateLayout.angle = when (orientation) {
+            1 -> 180
+            2 -> 90
+            3 -> -90
+            else -> 0
+        }
 
         if (needGrantPermission()) requestPermissions(permissions, UPDATE_PERMISSION_REQUEST_CODE)
 
@@ -89,13 +106,13 @@ class MainActivity : AppCompatActivity() {
             handleFromCommandServer(command, message)
         }
 
-        serialPortController =
+        /*serialPortController =
             SerialPortController(applicationContext, lifecycleScope, hubManager)
-        serialPortController.connectToSerialPort()
+        serialPortController.connectToSerialPort()*/
 
         mVideoLayout = findViewById(R.id.video_layout)
         playerManager = PlayerManager(applicationContext, lifecycleScope, viewModel, mVideoLayout)
-        val orientation = preference.getInt(PREF_ORIENTATION, 0)
+
         playerManager.rotationMode = orientation
 
         NetworkUtils.instance.startNetworkListener(this)
@@ -106,8 +123,6 @@ class MainActivity : AppCompatActivity() {
         registerObservers()
 
         appStorageManager = AppStorageManager(applicationContext)
-
-
     }
 
     override fun onStop() {
@@ -210,11 +225,11 @@ class MainActivity : AppCompatActivity() {
 
                     }
                     Status.UPDATE_STATUS -> {
-                        serialPortController.apply {
+                        /*serialPortController.apply {
                             writeToDevice(
                                 buildReadMessage(
                                     Define.FUNC_WRITE_READ_STATUS_PARAM, ""))
-                        }
+                        }*/
                     }
                     Status.GET_LOCATION -> {
                         val connectionId = responseHub.message
@@ -394,7 +409,8 @@ class MainActivity : AppCompatActivity() {
                     }
 
                     Status.CAPTURE_SCREEN -> {
-                        playerManager.captureScreen(playlistService)
+                        val isPortrait = orientation == 2 || orientation == 3
+                        playerManager.captureScreen(playlistService, isPortrait)
                     }
                 }
             }
@@ -408,14 +424,6 @@ class MainActivity : AppCompatActivity() {
         val listType = Types.newParameterizedType(List::class.java, String::class.java)
         val adapter = moshi.adapter<List<String>>(listType)
         return adapter.toJson(list)
-    }
-
-    private fun setMute(mute: String) {
-        val direction = if (mute == "1") AudioManager.ADJUST_MUTE
-        else AudioManager.ADJUST_UNMUTE
-
-        audioManager.adjustStreamVolume(
-            AudioManager.STREAM_MUSIC, direction, AudioManager.FLAG_SHOW_UI)
     }
 
     private fun setVolume(volumeToSet: Int) {
