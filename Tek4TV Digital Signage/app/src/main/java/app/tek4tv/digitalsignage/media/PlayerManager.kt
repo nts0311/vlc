@@ -1,20 +1,11 @@
 package app.tek4tv.digitalsignage.media
 
 import android.content.Context
-import android.graphics.Bitmap
-import android.graphics.Matrix
 import android.net.Uri
-import android.util.Base64
 import android.util.Log
-import android.view.TextureView
-import android.widget.FrameLayout
-import androidx.core.view.children
-import androidx.lifecycle.LiveData
-import androidx.lifecycle.MutableLiveData
 import app.tek4tv.digitalsignage.Timer
 import app.tek4tv.digitalsignage.model.MediaItem
 import app.tek4tv.digitalsignage.model.MediaType
-import app.tek4tv.digitalsignage.network.PlaylistService
 import app.tek4tv.digitalsignage.repo.PlaylistRepo
 import app.tek4tv.digitalsignage.ui.CustomPlayer
 import app.tek4tv.digitalsignage.viewmodels.MainViewModel
@@ -23,7 +14,6 @@ import org.videolan.libvlc.LibVLC
 import org.videolan.libvlc.Media
 import org.videolan.libvlc.MediaPlayer
 import org.videolan.libvlc.util.VLCVideoLayout
-import java.io.ByteArrayOutputStream
 import java.util.*
 
 class PlayerManager(
@@ -49,10 +39,6 @@ class PlayerManager(
             field = value
             setMainPlayerEventListener()
         }
-
-
-    //rotation mode
-    var rotationMode = 0
 
     private val playlistRepo: PlaylistRepo
         get() = viewModel.playlistRepo
@@ -438,59 +424,5 @@ class PlayerManager(
         if (!visualPlayer.isReleased) visualPlayer.release()
 
         mLibVLC.release()
-    }
-
-    fun captureScreen(service: PlaylistService, isPortrait: Boolean): LiveData<ByteArray?> {
-        val result = MutableLiveData<ByteArray>()
-        lifecycleScope.launch(Dispatchers.Default) {
-            try {
-                val tv: TextureView =
-                    (mVideoLayout.getChildAt(0) as FrameLayout).children.filter { it is TextureView }
-                        .first() as TextureView
-
-
-                val base64Img = withContext(Dispatchers.Default) {
-                    val bitmap = if (!isPortrait) getResizedBitmap(tv.bitmap, 640, 360)
-                    else getResizedBitmap(tv.bitmap, 360, 640)
-                    val bs = ByteArrayOutputStream()
-                    bitmap.compress(Bitmap.CompressFormat.JPEG, 100, bs)
-                    Base64.encodeToString(bs.toByteArray(), Base64.DEFAULT)
-                }
-
-
-                val body = mapOf(
-                    "Data" to base64Img,
-                    "Imei" to app.tek4tv.digitalsignage.utils.Utils.getDeviceId(applicationContext),
-                    "Extension" to ".jpg")
-
-                withContext(Dispatchers.IO) {
-                    service.postScreenshot(body)
-                }
-
-            } catch (e: Exception) {
-                result.postValue(null)
-                Log.e("capture", e.message ?: "")
-                e.printStackTrace()
-            }
-        }
-
-        return result
-    }
-
-    fun getResizedBitmap(bm: Bitmap, newWidth: Int, newHeight: Int): Bitmap {
-        val width = bm.width
-        val height = bm.height
-        val scaleWidth = newWidth.toFloat() / width
-        val scaleHeight = newHeight.toFloat() / height
-        // CREATE A MATRIX FOR THE MANIPULATION
-        val matrix = Matrix()
-        // RESIZE THE BIT MAP
-        matrix.postScale(scaleWidth, scaleHeight)
-
-        // "RECREATE" THE NEW BITMAP
-        val resizedBitmap = Bitmap.createBitmap(
-            bm, 0, 0, width, height, matrix, false)
-        bm.recycle()
-        return resizedBitmap
     }
 }

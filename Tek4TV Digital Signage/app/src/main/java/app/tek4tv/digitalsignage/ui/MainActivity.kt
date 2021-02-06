@@ -17,6 +17,7 @@ import app.tek4tv.digitalsignage.model.*
 import app.tek4tv.digitalsignage.network.PlaylistService
 import app.tek4tv.digitalsignage.utils.*
 import app.tek4tv.digitalsignage.viewmodels.MainViewModel
+import com.github.rongi.rotate_layout.layout.RotateLayout
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.Types
 import dagger.hilt.android.AndroidEntryPoint
@@ -47,7 +48,7 @@ class MainActivity : AppCompatActivity() {
         Manifest.permission.ACCESS_FINE_LOCATION,
         Manifest.permission.ACCESS_COARSE_LOCATION,
         Manifest.permission.ACCESS_WIFI_STATE,
-    )
+        Manifest.permission.RECORD_AUDIO)
 
     private lateinit var mVideoLayout: VLCVideoLayout
 
@@ -74,8 +75,9 @@ class MainActivity : AppCompatActivity() {
 
     private var locationTracker = LocationTracker()
 
-    private lateinit var rotateLayout: com.github.rongi.rotate_layout.layout.RotateLayout
     private var orientation: Int = 0
+
+    private lateinit var mediaCapture: MediaCapture
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -83,22 +85,9 @@ class MainActivity : AppCompatActivity() {
 
         Thread.setDefaultUncaughtExceptionHandler(CrashHandler(this))
 
-        rotateLayout = findViewById(R.id.main_root)
-
         preference = getPreferences(MODE_PRIVATE)
-        orientation = preference.getInt(PREF_ORIENTATION, 0)
-        /*if(orientation == 0 || orientation == 1)
-            requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
-        else
-            requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT*/
 
-        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
-        rotateLayout.angle = when (orientation) {
-            1 -> 180
-            2 -> 90
-            3 -> -90
-            else -> 0
-        }
+        setViewOrientation()
 
         if (needGrantPermission()) requestPermissions(permissions, UPDATE_PERMISSION_REQUEST_CODE)
 
@@ -113,7 +102,6 @@ class MainActivity : AppCompatActivity() {
         mVideoLayout = findViewById(R.id.video_layout)
         playerManager = PlayerManager(applicationContext, lifecycleScope, viewModel, mVideoLayout)
 
-        playerManager.rotationMode = orientation
 
         NetworkUtils.instance.startNetworkListener(this)
 
@@ -123,6 +111,15 @@ class MainActivity : AppCompatActivity() {
         registerObservers()
 
         appStorageManager = AppStorageManager(applicationContext)
+
+        mediaCapture = MediaCapture(applicationContext, lifecycleScope)
+
+        lifecycleScope.launch {
+            delay(5000)
+            mediaCapture.startCaptureAudio()
+            delay(20000)
+            mediaCapture.stopAudioCapture()
+        }
     }
 
     override fun onStop() {
@@ -139,6 +136,21 @@ class MainActivity : AppCompatActivity() {
         super.onStart()
         playerManager.attachVisualPlayerView()
         startPlayingMedia()
+    }
+
+    private fun setViewOrientation() {
+        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+
+        orientation = preference.getInt(PREF_ORIENTATION, 0)
+
+        val rotateLayout: RotateLayout = findViewById(R.id.main_root)
+
+        rotateLayout.angle = when (orientation) {
+            1 -> 180
+            2 -> 90
+            3 -> -90
+            else -> 0
+        }
     }
 
     private fun needGrantPermission(): Boolean {
@@ -410,7 +422,12 @@ class MainActivity : AppCompatActivity() {
 
                     Status.CAPTURE_SCREEN -> {
                         val isPortrait = orientation == 2 || orientation == 3
-                        playerManager.captureScreen(playlistService, isPortrait)
+                        mediaCapture.captureScreen(playlistService, isPortrait, mVideoLayout)
+                    }
+
+                    Status.RECORD -> {
+                        val isMute = responseHub.message!!
+
                     }
                 }
             }
