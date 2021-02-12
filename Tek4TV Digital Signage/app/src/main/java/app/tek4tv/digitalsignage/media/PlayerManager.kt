@@ -3,6 +3,9 @@ package app.tek4tv.digitalsignage.media
 import android.content.Context
 import android.net.Uri
 import android.util.Log
+import android.view.SurfaceView
+import android.widget.FrameLayout
+import androidx.core.view.children
 import app.tek4tv.digitalsignage.Timer
 import app.tek4tv.digitalsignage.model.MediaItem
 import app.tek4tv.digitalsignage.model.MediaType
@@ -62,7 +65,8 @@ class PlayerManager(
         args.add("--network-caching=5000")
         args.add("--no-http-reconnect")
         args.add("--disc-caching=8000")
-        args.add("--sout-mux-caching=8000")
+        args.add("--video-filter=rotate")
+        args.add("--rotate-angle=90")
 
         timer = Timer(lifecycleScope)
         timer.start()
@@ -79,7 +83,11 @@ class PlayerManager(
     }
 
     fun attachVisualPlayerView() {
-        visualPlayer.attachViews(mVideoLayout, null, false, true)
+        visualPlayer.attachViews(mVideoLayout, null, false, false)
+        val sf = (mVideoLayout.getChildAt(0) as FrameLayout).children.filter { it is SurfaceView }
+            .first() as SurfaceView
+
+
     }
 
     fun playMediaByIndex(index: Int) {
@@ -135,7 +143,6 @@ class PlayerManager(
     private fun playMutedVideo(videoItem: MediaItem) {
         val video: Media = videoItem.getVlcMedia(mLibVLC)
         video.addOption(":no-audio")
-        video.addOption(":fullscreen")
         visualPlayer.media = video
         visualPlayer.play()
 

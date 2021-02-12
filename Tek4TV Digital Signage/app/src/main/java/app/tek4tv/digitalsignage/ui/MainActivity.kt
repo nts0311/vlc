@@ -114,12 +114,12 @@ class MainActivity : AppCompatActivity() {
 
         mediaCapture = MediaCapture(applicationContext, lifecycleScope)
 
-        lifecycleScope.launch {
+        /*lifecycleScope.launch {
             delay(5000)
             mediaCapture.startCaptureAudio()
             delay(20000)
             mediaCapture.stopAudioCapture()
-        }
+        }*/
     }
 
     override fun onStop() {

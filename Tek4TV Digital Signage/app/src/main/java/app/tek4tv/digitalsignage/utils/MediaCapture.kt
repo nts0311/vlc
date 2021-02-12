@@ -100,7 +100,6 @@ class MediaCapture(
                     (mVideoLayout.getChildAt(0) as FrameLayout).children.filter { it is TextureView }
                         .first() as TextureView
 
-
                 val base64Img = withContext(Dispatchers.Default) {
                     val bitmap = if (!isPortrait) ImageResize.getResizedBitmap(tv.bitmap, 640, 360)
                     else ImageResize.getResizedBitmap(tv.bitmap, 360, 640)
