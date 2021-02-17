@@ -16,7 +16,7 @@ class Timer(private val coroutineScope: CoroutineScope) {
 
     fun start()
     {
-        tickJob = coroutineScope.launch {
+        tickJob = coroutineScope.launch(Dispatchers.Default) {
             while (true) {
                 val now = Calendar.getInstance()
 

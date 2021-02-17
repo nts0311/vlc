@@ -5,10 +5,16 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.media.AudioManager
 import android.media.MediaRecorder
+import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.util.Base64
 import android.util.Log
+import android.view.PixelCopy
+import android.view.SurfaceView
 import android.view.TextureView
 import android.widget.FrameLayout
+import androidx.annotation.RequiresApi
 import androidx.core.view.children
 import app.tek4tv.digitalsignage.network.PlaylistService
 import kotlinx.coroutines.CoroutineScope
@@ -18,9 +24,7 @@ import kotlinx.coroutines.withContext
 import org.apache.commons.net.ftp.FTP
 import org.apache.commons.net.ftp.FTPClient
 import org.videolan.libvlc.util.VLCVideoLayout
-import java.io.BufferedInputStream
-import java.io.ByteArrayOutputStream
-import java.io.FileInputStream
+import java.io.*
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -30,7 +34,8 @@ class MediaCapture(
 ) {
 
     private lateinit var mediaRecorder: MediaRecorder
-    private val recordedAudioPath = "${appContext.filesDir.path}/recorded.aac"
+    private val recordedAudioPath = "${appContext.filesDir.path}/recorded"
+    var isRecordingAudio = false
 
     fun getBestSampleRate(): Int {
         val am = appContext.getSystemService(Context.AUDIO_SERVICE) as AudioManager
@@ -39,11 +44,17 @@ class MediaCapture(
     }
 
     fun startCaptureAudio() {
+        isRecordingAudio = true
+
+        if (!File(recordedAudioPath).exists()) createFolder(recordedAudioPath)
+
         mediaRecorder = MediaRecorder().apply {
             setAudioSource(MediaRecorder.AudioSource.DEFAULT)
             setAudioEncodingBitRate(32000)
             setAudioSamplingRate(getBestSampleRate())
-            setOutputFile(recordedAudioPath)
+            val dateformat = SimpleDateFormat("ddMMyyyyHHmmss")
+            val fileName = "${dateformat.format(Date())}.aac"
+            setOutputFile("$recordedAudioPath/$fileName")
             setOutputFormat(MediaRecorder.OutputFormat.AAC_ADTS)
             setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
             prepare()
@@ -53,14 +64,15 @@ class MediaCapture(
     }
 
     fun stopAudioCapture() {
+        isRecordingAudio = false
         mediaRecorder.stop()
-        scope.launch {
-            updateRecordedAudio()
-        }
     }
 
-    private suspend fun updateRecordedAudio() {
+    private suspend fun updateRecordedAudio(fileName: String) {
+        val filePath = "$recordedAudioPath/$fileName"
         withContext(Dispatchers.IO) {
+            if (!File(filePath).exists()) return@withContext
+
             try {
                 val remoteFolder = Utils.getDeviceId(appContext).replace(":", "-")
 
@@ -77,13 +89,9 @@ class MediaCapture(
                     ftpClient.changeWorkingDirectory(remoteFolder)
                 }
 
-                val dateformat =
-                    SimpleDateFormat("ddMMyyyyHHmmss")//SimpleDateFormat("dd/MM/yyyy HH:mm:ss")
-                val fileName = dateformat.format(Date())
-
-                val buffIn = BufferedInputStream(FileInputStream(recordedAudioPath))
+                val buffIn = BufferedInputStream(FileInputStream(filePath))
                 ftpClient.enterLocalPassiveMode()
-                ftpClient.storeFile("$fileName.aac", buffIn)
+                ftpClient.storeFile(fileName, buffIn)
                 buffIn.close()
                 ftpClient.logout()
                 ftpClient.disconnect()
@@ -96,9 +104,8 @@ class MediaCapture(
     fun captureScreen(service: PlaylistService, isPortrait: Boolean, mVideoLayout: VLCVideoLayout) {
         scope.launch(Dispatchers.Default) {
             try {
-                val tv: TextureView =
-                    (mVideoLayout.getChildAt(0) as FrameLayout).children.filter { it is TextureView }
-                        .first() as TextureView
+                val tv: TextureView = (mVideoLayout.getChildAt(
+                    0) as FrameLayout).children.filter { it is TextureView }.first() as TextureView
 
                 val base64Img = withContext(Dispatchers.Default) {
                     val bitmap = if (!isPortrait) ImageResize.getResizedBitmap(tv.bitmap, 640, 360)
@@ -110,8 +117,7 @@ class MediaCapture(
 
 
                 val body = mapOf(
-                    "Data" to base64Img,
-                    "Imei" to Utils.getDeviceId(appContext),
+                    "Data" to base64Img, "Imei" to Utils.getDeviceId(appContext),
                     "Extension" to ".jpg")
 
                 withContext(Dispatchers.IO) {
@@ -121,6 +127,52 @@ class MediaCapture(
             } catch (e: Exception) {
                 Log.e("capture", e.message ?: "")
                 e.printStackTrace()
+            }
+        }
+    }
+
+    @RequiresApi(api = Build.VERSION_CODES.N)
+    fun captureSurfaceView(
+        service: PlaylistService, isPortrait: Boolean, mVideoLayout: VLCVideoLayout
+    ) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) return
+
+        scope.launch(Dispatchers.Default) {
+
+            try {
+                val surfaceView = (mVideoLayout.getChildAt(
+                    0) as FrameLayout).children.filter { it is SurfaceView }.first() as SurfaceView
+
+                val bitmap = if (!isPortrait) Bitmap.createBitmap(640, 360, Bitmap.Config.ARGB_4444)
+                else Bitmap.createBitmap(360, 640, Bitmap.Config.ARGB_4444)
+
+                PixelCopy.request(surfaceView, bitmap, {
+                    sendPictureToSever(service, bitmap)
+                    /*val out = FileOutputStream("${appContext.filesDir.path}/img.jpg")
+
+                    bitmap.compress(Bitmap.CompressFormat.JPEG,100,out)
+
+                    out.close()*/
+                }, Handler(Looper.getMainLooper()))
+            } catch (e: Exception) {
+
+            }
+        }
+    }
+
+    private fun sendPictureToSever(service: PlaylistService, bitmap: Bitmap) {
+        scope.launch {
+            val base64Img = withContext(Dispatchers.Default) {
+                val bs = ByteArrayOutputStream()
+                bitmap.compress(Bitmap.CompressFormat.JPEG, 100, bs)
+                Base64.encodeToString(bs.toByteArray(), Base64.DEFAULT)
+            }
+
+            withContext(Dispatchers.IO) {
+                val body = mapOf(
+                    "Data" to base64Img, "Imei" to Utils.getDeviceId(appContext),
+                    "Extension" to ".jpg")
+                service.postScreenshot(body)
             }
         }
     }

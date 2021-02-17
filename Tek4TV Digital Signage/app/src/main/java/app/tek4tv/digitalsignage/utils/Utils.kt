@@ -20,6 +20,7 @@ class Utils {
         const val DEVICE_INFO = "DEVICE_INFO"
         const val GET_AUDIO_PATH = "GET_AUDIO_PATH"
         const val GET_MEDIA_PATH = "GET_MEDIA_PATH"
+        const val GET_RECORD = "GET_RECORD"
 
         @SuppressLint("HardwareIds")
         fun getDeviceId(context: Context): String {

@@ -2,6 +2,7 @@ package app.tek4tv.digitalsignage.utils
 
 object Status {
     const val RECORD = "RECORD"
+    const val GET_RECORD = "GET_RECORD"
     const val CAPTURE_SCREEN = "CAPTURE_SCREEN"
     const val SET_MUTE_PLAYER = "SET_MUTE_PLAYER"
     const val GET_LIST = "GET_LIST"

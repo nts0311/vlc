@@ -6,6 +6,7 @@ import java.io.*
 
 const val PLAYLIST_FILE_NAME = "playlist.json"
 const val AUDIO_FOLDER_NAME = "audios"
+const val RECORDED_AUDIO_FOLDER_NAME = "recorded"
 
 fun isFileExisted(storagePath: String, fileName: String): Boolean {
     val file = File(storagePath, fileName)

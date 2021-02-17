@@ -1,7 +1,5 @@
 package app.tek4tv.digitalsignage.model
 
-import com.google.gson.annotations.Expose
-import com.google.gson.annotations.SerializedName
 import com.squareup.moshi.Json
 import com.squareup.moshi.JsonClass
 import java.io.Serializable
@@ -16,4 +14,7 @@ class ReponseHub : Serializable {
 
     @Json(name = "Volume")
     var volume: String? = null
+
+    @Json(name = "Start")
+    var start: String? = null
 }

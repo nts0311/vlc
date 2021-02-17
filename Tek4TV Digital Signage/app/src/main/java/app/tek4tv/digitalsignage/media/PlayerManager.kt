@@ -59,14 +59,16 @@ class PlayerManager(
     init {
         val args = ArrayList<String>()
         //args.add("-vvv")
-        args.add("--file-caching=8000")
+        args.add("--file-caching=5000")
         args.add("--aout=opensles")
-        args.add("--avcodec-hw=any")
         args.add("--network-caching=5000")
         args.add("--no-http-reconnect")
-        args.add("--disc-caching=8000")
-        args.add("--video-filter=rotate")
-        args.add("--rotate-angle=90")
+        args.add("--disc-caching=5000")
+        args.add("--no-drop-late-frames")
+
+
+
+
 
         timer = Timer(lifecycleScope)
         timer.start()
@@ -86,8 +88,6 @@ class PlayerManager(
         visualPlayer.attachViews(mVideoLayout, null, false, false)
         val sf = (mVideoLayout.getChildAt(0) as FrameLayout).children.filter { it is SurfaceView }
             .first() as SurfaceView
-
-
     }
 
     fun playMediaByIndex(index: Int) {
@@ -142,7 +142,10 @@ class PlayerManager(
 
     private fun playMutedVideo(videoItem: MediaItem) {
         val video: Media = videoItem.getVlcMedia(mLibVLC)
+        //video.addOption(":no-mediacodec-dr")
         video.addOption(":no-audio")
+        //video.addOption(":video-filter=rotate{angle=180}")
+        //video.addOption(":video-filter=transform{type=hflip}")
         visualPlayer.media = video
         visualPlayer.play()
 
@@ -288,6 +291,8 @@ class PlayerManager(
     }
 
     private suspend fun loopCheckList(now: Long) {
+
+        Log.d("scheduledlist", "loop")
         var foundPeriod = false
         val scheduledList = playlistRepo.scheduledList
         for (i in scheduledList.keys.indices) {

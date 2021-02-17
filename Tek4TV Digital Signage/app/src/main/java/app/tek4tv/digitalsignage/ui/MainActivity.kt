@@ -87,7 +87,7 @@ class MainActivity : AppCompatActivity() {
 
         preference = getPreferences(MODE_PRIVATE)
 
-        setViewOrientation()
+        //setViewOrientation()
 
         if (needGrantPermission()) requestPermissions(permissions, UPDATE_PERMISSION_REQUEST_CODE)
 
@@ -114,10 +114,11 @@ class MainActivity : AppCompatActivity() {
 
         mediaCapture = MediaCapture(applicationContext, lifecycleScope)
 
-        /*lifecycleScope.launch {
+/*        lifecycleScope.launch {
             delay(5000)
+            mediaCapture.captureSurfaceView(playlistService, true, mVideoLayout)
             mediaCapture.startCaptureAudio()
-            delay(20000)
+            delay(10000)
             mediaCapture.stopAudioCapture()
         }*/
     }
@@ -130,6 +131,7 @@ class MainActivity : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
         playerManager.onActivityDestroy()
+        if (mediaCapture.isRecordingAudio) mediaCapture.stopAudioCapture()
     }
 
     override fun onStart() {
@@ -426,8 +428,23 @@ class MainActivity : AppCompatActivity() {
                     }
 
                     Status.RECORD -> {
-                        val isMute = responseHub.message!!
+                        val shouldStart = responseHub.start!! == "1"
 
+                        if (shouldStart) {
+                            if (mediaCapture.isRecordingAudio) mediaCapture.stopAudioCapture()
+
+                            mediaCapture.startCaptureAudio()
+                        } else {
+                            if (mediaCapture.isRecordingAudio) mediaCapture.stopAudioCapture()
+                        }
+                    }
+
+                    Status.GET_RECORD -> {
+                        val connectionId = responseHub.message!!
+                        val recordedAudioList =
+                            toJsonList(appStorageManager.getAllRecordedAudioPath())
+                        hubManager.sendHubDirectMessage(
+                            connectionId, Utils.GET_RECORD, recordedAudioList)
                     }
                 }
             }
