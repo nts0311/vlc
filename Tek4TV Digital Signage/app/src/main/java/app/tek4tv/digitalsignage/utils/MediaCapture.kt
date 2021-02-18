@@ -68,37 +68,41 @@ class MediaCapture(
         mediaRecorder.stop()
     }
 
-    private suspend fun updateRecordedAudio(fileName: String) {
-        val filePath = "$recordedAudioPath/$fileName"
-        withContext(Dispatchers.IO) {
-            if (!File(filePath).exists()) return@withContext
+    fun updateRecordedAudio(filePath: String) {
+        scope.launch {
+            withContext(Dispatchers.IO) {
+                if (!File(filePath).exists()) return@withContext
 
-            try {
-                val remoteFolder = Utils.getDeviceId(appContext).replace(":", "-")
+                try {
+                    val remoteFolder = Utils.getDeviceId(appContext).replace(":", "-")
 
-                val ftpClient = FTPClient()
-                ftpClient.connect("14.225.16.145")
-                ftpClient.login("sondev", "123456")
-                ftpClient.setFileType(FTP.BINARY_FILE_TYPE)
+                    val ftpClient = FTPClient()
+                    ftpClient.connect("14.225.16.145")
+                    ftpClient.login("sondev", "123456")
+                    ftpClient.setFileType(FTP.BINARY_FILE_TYPE)
 
 
-                val isRemoteFolderExisted = ftpClient.changeWorkingDirectory(remoteFolder)
+                    val isRemoteFolderExisted = ftpClient.changeWorkingDirectory(remoteFolder)
 
-                if (!isRemoteFolderExisted) {
-                    ftpClient.makeDirectory("/$remoteFolder")
-                    ftpClient.changeWorkingDirectory(remoteFolder)
+                    if (!isRemoteFolderExisted) {
+                        ftpClient.makeDirectory("/$remoteFolder")
+                        ftpClient.changeWorkingDirectory(remoteFolder)
+                    }
+
+                    val buffIn = BufferedInputStream(FileInputStream(filePath))
+                    ftpClient.enterLocalPassiveMode()
+                    val res = ftpClient.storeFile(File(filePath).name, buffIn)
+                    Log.d("upfile", res.toString())
+                    buffIn.close()
+                    ftpClient.logout()
+                    ftpClient.disconnect()
+                } catch (e: Exception) {
+                    e.printStackTrace()
                 }
-
-                val buffIn = BufferedInputStream(FileInputStream(filePath))
-                ftpClient.enterLocalPassiveMode()
-                ftpClient.storeFile(fileName, buffIn)
-                buffIn.close()
-                ftpClient.logout()
-                ftpClient.disconnect()
-            } catch (e: Exception) {
-                e.printStackTrace()
             }
         }
+
+        //val filePath = "$recordedAudioPath/$fileName
     }
 
     fun captureScreen(service: PlaylistService, isPortrait: Boolean, mVideoLayout: VLCVideoLayout) {
@@ -148,11 +152,11 @@ class MediaCapture(
 
                 PixelCopy.request(surfaceView, bitmap, {
                     sendPictureToSever(service, bitmap)
-                    /*val out = FileOutputStream("${appContext.filesDir.path}/img.jpg")
+                    /* val out = FileOutputStream("${appContext.filesDir.path}/img.jpg")
 
-                    bitmap.compress(Bitmap.CompressFormat.JPEG,100,out)
+                     bitmap.compress(Bitmap.CompressFormat.JPEG,100,out)
 
-                    out.close()*/
+                     out.close()*/
                 }, Handler(Looper.getMainLooper()))
             } catch (e: Exception) {
 

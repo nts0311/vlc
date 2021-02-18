@@ -10,7 +10,7 @@ import kotlinx.coroutines.sync.withLock
 import java.util.*
 import kotlin.coroutines.resume
 
-class DownloadHelper(
+class DownloadHelper private constructor(
     private val scope: CoroutineScope
 ) {
     private val CHUNK_SIZE = 5
@@ -94,4 +94,19 @@ class DownloadHelper(
             if (!isDownloading) startDownload()
         }
     }
+
+    companion object {
+        private var instance: DownloadHelper? = null
+        fun getInstance(scope: CoroutineScope): DownloadHelper {
+            if (instance == null) instance = DownloadHelper(scope)
+            return instance!!
+        }
+    }
+}
+
+class DownloadItem {
+    var itDownloadUrl = ""
+    var itStoragePath = ""
+    var itFileName = ""
+    var downloadListener: OnDownloadListener? = null
 }

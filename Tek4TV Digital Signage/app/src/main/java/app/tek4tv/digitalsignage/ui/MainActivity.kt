@@ -17,7 +17,6 @@ import app.tek4tv.digitalsignage.model.*
 import app.tek4tv.digitalsignage.network.PlaylistService
 import app.tek4tv.digitalsignage.utils.*
 import app.tek4tv.digitalsignage.viewmodels.MainViewModel
-import com.github.rongi.rotate_layout.layout.RotateLayout
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.Types
 import dagger.hilt.android.AndroidEntryPoint
@@ -87,7 +86,7 @@ class MainActivity : AppCompatActivity() {
 
         preference = getPreferences(MODE_PRIVATE)
 
-        //setViewOrientation()
+        setViewOrientation()
 
         if (needGrantPermission()) requestPermissions(permissions, UPDATE_PERMISSION_REQUEST_CODE)
 
@@ -114,12 +113,9 @@ class MainActivity : AppCompatActivity() {
 
         mediaCapture = MediaCapture(applicationContext, lifecycleScope)
 
-/*        lifecycleScope.launch {
-            delay(5000)
-            mediaCapture.captureSurfaceView(playlistService, true, mVideoLayout)
-            mediaCapture.startCaptureAudio()
+        /*lifecycleScope.launch {
             delay(10000)
-            mediaCapture.stopAudioCapture()
+            mediaCapture.updateRecordedAudio("/data/user/0/app.tek4tv.digitalsignage/files/recorded/18022021160554.aac")
         }*/
     }
 
@@ -141,18 +137,23 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setViewOrientation() {
-        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+        //requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
 
         orientation = preference.getInt(PREF_ORIENTATION, 0)
 
-        val rotateLayout: RotateLayout = findViewById(R.id.main_root)
+        requestedOrientation = when (orientation) {
+            2, 3 -> ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+            else -> ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+        }
+
+        /*val rotateLayout: RotateLayout = findViewById(R.id.main_root)
 
         rotateLayout.angle = when (orientation) {
             1 -> 180
             2 -> 90
             3 -> -90
             else -> 0
-        }
+        }*/
     }
 
     private fun needGrantPermission(): Boolean {
@@ -170,7 +171,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun registerObservers() {
         viewModel.broadcastList.observe(this) {
-            playerManager.audioList = viewModel.getAudioList(applicationContext)
+            playerManager.audioList = viewModel.audioRepo.audioFileUri
             playerManager.onNewBroadcastList()
             playerManager.checkScheduledMedia()
             viewModel.downloadMedias(applicationContext)
@@ -311,7 +312,7 @@ class MainActivity : AppCompatActivity() {
                             viewModel.getAudioListFromNetwork(
                                 applicationContext, responseHub.message!!)
 
-                            playerManager.audioList = viewModel.getAudioList(applicationContext)
+                            //playerManager.audioList = viewModel.getAudioList(applicationContext)
                         }
                     }
                     Status.ROTATION -> {
@@ -424,7 +425,8 @@ class MainActivity : AppCompatActivity() {
 
                     Status.CAPTURE_SCREEN -> {
                         val isPortrait = orientation == 2 || orientation == 3
-                        mediaCapture.captureScreen(playlistService, isPortrait, mVideoLayout)
+                        mediaCapture.captureSurfaceView(playlistService, isPortrait, mVideoLayout)
+                        //mediaCapture.captureScreen(playlistService, isPortrait, mVideoLayout)
                     }
 
                     Status.RECORD -> {
@@ -445,6 +447,11 @@ class MainActivity : AppCompatActivity() {
                             toJsonList(appStorageManager.getAllRecordedAudioPath())
                         hubManager.sendHubDirectMessage(
                             connectionId, Utils.GET_RECORD, recordedAudioList)
+                    }
+
+                    Status.UPLOAD_RECORDED -> {
+                        val filePath = responseHub.message!!
+                        mediaCapture.updateRecordedAudio(filePath)
                     }
                 }
             }

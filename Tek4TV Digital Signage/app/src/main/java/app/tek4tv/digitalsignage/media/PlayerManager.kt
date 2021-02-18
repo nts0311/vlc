@@ -49,7 +49,7 @@ class PlayerManager(
     var currentPlaylist = listOf<MediaItem>()
 
     private var audioIndex = 0
-    var audioList = listOf<Uri>()
+    var audioList = mutableListOf<Uri>()
 
     //-1 for random unscheduled media
     //0 for init
@@ -66,10 +66,6 @@ class PlayerManager(
         args.add("--disc-caching=5000")
         args.add("--no-drop-late-frames")
 
-
-
-
-
         timer = Timer(lifecycleScope)
         timer.start()
 
@@ -81,7 +77,7 @@ class PlayerManager(
         visualPlayer = CustomPlayer(mLibVLC)
         audioPlayer = CustomPlayer(mLibVLC)
 
-        audioList = viewModel.getAudioList(applicationContext)
+        audioList = viewModel.audioRepo.audioFileUri
     }
 
     fun attachVisualPlayerView() {
@@ -208,14 +204,14 @@ class PlayerManager(
 
     private fun playRandomAudio() {
         if (audioList.isEmpty()) {
-            audioList = viewModel.getAudioList(applicationContext)
+            audioList = viewModel.audioRepo.audioFileUri
             audioIndex = 0
         }
 
         if (audioList.isNotEmpty()) {
             if (audioIndex >= audioList.size) {
                 audioIndex = 0
-                audioList = audioList.shuffled()
+                audioList = audioList.shuffled() as MutableList<Uri>
             }
 
             val audioItem = audioList[audioIndex++]
@@ -291,8 +287,6 @@ class PlayerManager(
     }
 
     private suspend fun loopCheckList(now: Long) {
-
-        Log.d("scheduledlist", "loop")
         var foundPeriod = false
         val scheduledList = playlistRepo.scheduledList
         for (i in scheduledList.keys.indices) {
@@ -339,7 +333,7 @@ class PlayerManager(
 
     private fun setPlaylistContent(playlist: List<MediaItem>, audios: List<Uri>) {
         this.currentPlaylist = playlist
-        this.audioList = audios
+        //this.audioList = audios
 
         viewModel.playlistIndex = 0
 

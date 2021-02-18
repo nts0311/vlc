@@ -20,7 +20,7 @@ class MediaDownloadManager(
     //private val downloadManager = DownloadManager(scope)
     private val imageResize = ImageResize(scope)
 
-    private val downloadHelper = DownloadHelper(scope)
+    private val downloadHelper = DownloadHelper.getInstance(scope)
 
     var broadcastList: List<MediaItem> = listOf()
         set(value) {
@@ -39,7 +39,7 @@ class MediaDownloadManager(
     fun checkPlaylist(appContext: Context) {
         checkPlaylistJob?.cancel()
 
-        checkPlaylistJob = scope.launch {
+        checkPlaylistJob = scope.launch(Dispatchers.Default) {
             while (true) {
                 if (playlist.isNotEmpty()) {
                     var foundBrokenPath = false

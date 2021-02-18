@@ -1,10 +1,12 @@
 package app.tek4tv.digitalsignage.utils
 
+import android.net.Uri
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.*
 
 const val PLAYLIST_FILE_NAME = "playlist.json"
+const val AUDIO_LIST_FILE_NAME = "audio_list.json"
 const val AUDIO_FOLDER_NAME = "audios"
 const val RECORDED_AUDIO_FOLDER_NAME = "recorded"
 
@@ -53,10 +55,16 @@ fun isFolderExisted(storagePath: String): Boolean {
 }
 
 fun getAllFileNameInFolder(storagePath: String): List<String> {
-    val folder = File(storagePath)
-    val audio = listOf("mp3")
-    return folder.listFiles().filter { file -> file.isFile && audio.any { file.name.endsWith(it) } }
-        .map { it.name }
+    return try {
+        val folder = File(storagePath)
+        val audio = listOf("mp3")
+        folder.listFiles().filter { file -> file.isFile && audio.any { file.name.endsWith(it) } }
+            .map { it.name }
+    } catch (e: Exception) {
+        e.printStackTrace()
+        listOf()
+    }
+
 }
 
 fun getAllFilePathInFolder(storagePath: String): List<String> {
@@ -91,5 +99,15 @@ fun deleteAllFileInFolder(path: String) {
     } catch (e: Exception) {
         e.printStackTrace()
     }
+}
+
+fun getFileNameFromUrl(url: String): String {
+    var fileName = File(Uri.parse(url).path).name
+    val slash = fileName.lastIndexOf("\\")
+
+    if (slash != -1) {
+        fileName = fileName.substring(slash + 1)
+    }
+    return fileName
 }
 
