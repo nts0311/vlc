@@ -30,14 +30,13 @@ class AudioRepo @Inject constructor(
     var audioUrls = listOf<String>()
     var audioFileUri = mutableListOf<Uri>()
 
-    val audioFolderPath = "${appContext.filesDir.path}/$AUDIO_FOLDER_NAME"
+    private val audioFolderPath = "${appContext.filesDir.path}/$AUDIO_FOLDER_NAME"
 
     private var downloadAudioJob: Job? = null
 
     init {
         audioFileUri = getAllFileNameInFolder(audioFolderPath).map {
             filenameToUri(it)
-            //Uri.parse("file://$audioFolderPath/$it")
         }.shuffled() as MutableList<Uri>
         downloadHelper = DownloadHelper.getInstance(coroutineScope)
     }
@@ -80,7 +79,7 @@ class AudioRepo @Inject constructor(
         }
     }
 
-    private suspend fun downloadAnAudio(url: String) {
+    private fun downloadAnAudio(url: String) {
         if (url.isEmpty() || !url.startsWith("http")) return
 
         //if (url.isNotEmpty() && url.startsWith("http")) {

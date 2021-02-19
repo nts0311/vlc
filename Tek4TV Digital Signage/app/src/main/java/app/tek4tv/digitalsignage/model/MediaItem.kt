@@ -38,8 +38,6 @@ data class MediaItem(
         @Json(name = "Category")
         var category: Category? = null,
 
-        var isCheck: Boolean = false,
-
         @Json(name = "FixTime")
         var fixTime: String = "",
 

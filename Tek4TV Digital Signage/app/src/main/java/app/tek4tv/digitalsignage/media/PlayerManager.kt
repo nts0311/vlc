@@ -9,7 +9,7 @@ import androidx.core.view.children
 import app.tek4tv.digitalsignage.Timer
 import app.tek4tv.digitalsignage.model.MediaItem
 import app.tek4tv.digitalsignage.model.MediaType
-import app.tek4tv.digitalsignage.repo.PlaylistRepo
+import app.tek4tv.digitalsignage.repo.MediaRepo
 import app.tek4tv.digitalsignage.ui.CustomPlayer
 import app.tek4tv.digitalsignage.viewmodels.MainViewModel
 import kotlinx.coroutines.*
@@ -43,8 +43,8 @@ class PlayerManager(
             setMainPlayerEventListener()
         }
 
-    private val playlistRepo: PlaylistRepo
-        get() = viewModel.playlistRepo
+    private val playlistRepo: MediaRepo
+        get() = viewModel.mediaRepo
 
     var currentPlaylist = listOf<MediaItem>()
 

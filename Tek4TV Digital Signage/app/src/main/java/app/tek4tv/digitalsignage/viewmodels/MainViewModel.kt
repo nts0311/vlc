@@ -9,14 +9,14 @@ import androidx.lifecycle.viewModelScope
 import app.tek4tv.digitalsignage.media.MediaDownloadManager
 import app.tek4tv.digitalsignage.model.MediaItem
 import app.tek4tv.digitalsignage.repo.AudioRepo
-import app.tek4tv.digitalsignage.repo.PlaylistRepo
+import app.tek4tv.digitalsignage.repo.MediaRepo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
 
 class MainViewModel @ViewModelInject constructor(
-    val playlistRepo: PlaylistRepo, val audioRepo: AudioRepo
+    internal val mediaRepo: MediaRepo, val audioRepo: AudioRepo
 ) : ViewModel() {
 
     var isPlaying: Boolean = false
@@ -25,8 +25,7 @@ class MainViewModel @ViewModelInject constructor(
 
     private var getPlaylistJob: Job? = null
 
-    private var mediaDownloadManager: MediaDownloadManager =
-        MediaDownloadManager(viewModelScope, playlistRepo)
+    private var mediaDownloadManager = MediaDownloadManager(viewModelScope, mediaRepo, audioRepo)
 
     var playlistIndex = 0
 
@@ -39,9 +38,9 @@ class MainViewModel @ViewModelInject constructor(
         if (getPlaylistJob != null) return
 
         getPlaylistJob = viewModelScope.launch {
-            val res = playlistRepo.getBroadcastList(context.filesDir.path, needUpdate)
+            val res = mediaRepo.getBroadcastList(needUpdate)
 
-            mediaDownloadManager.broadcastList = res
+            //mediaDownloadManager.broadcastList = res
 
             broadcastList.value = res
 
@@ -50,12 +49,12 @@ class MainViewModel @ViewModelInject constructor(
     }
 
     fun checkPlaylist(appContext: Context) {
-        mediaDownloadManager.checkPlaylist(appContext)
+        mediaDownloadManager.checkPlaylist()
     }
 
-    fun downloadMedias(appContext: Context)
-    {
-        mediaDownloadManager.downloadMedias(appContext)
+    fun downloadMedias(appContext: Context) {
+        // mediaDownloadManager.downloadMedias(appContext)
+        mediaRepo.startDownloadMedia()
     }
 
     fun getAudioListFromNetwork(appContext: Context, url: String) {

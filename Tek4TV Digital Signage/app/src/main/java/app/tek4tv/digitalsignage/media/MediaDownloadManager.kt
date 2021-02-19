@@ -1,25 +1,19 @@
 package app.tek4tv.digitalsignage.media
 
-import android.content.Context
-import android.net.Uri
 import android.util.Log
-import app.tek4tv.digitalsignage.model.MediaItem
-import app.tek4tv.digitalsignage.model.MediaType
-import app.tek4tv.digitalsignage.repo.PlaylistRepo
+import app.tek4tv.digitalsignage.repo.AudioRepo
+import app.tek4tv.digitalsignage.repo.MediaRepo
 import app.tek4tv.digitalsignage.utils.*
-import com.downloader.Error
-import com.downloader.OnDownloadListener
 import kotlinx.coroutines.*
 import java.io.File
 
 class MediaDownloadManager(
     private val scope: CoroutineScope,
-    private val playlistRepo: PlaylistRepo,
+    private val mediaRepo: MediaRepo,
+    private val audioRepo: AudioRepo
 ) {
 
-    //private val downloadManager = DownloadManager(scope)
-    private val imageResize = ImageResize(scope)
-
+    /*private val imageResize = ImageResize(scope)
     private val downloadHelper = DownloadHelper.getInstance(scope)
 
     var broadcastList: List<MediaItem> = listOf()
@@ -34,40 +28,45 @@ class MediaDownloadManager(
     private var checkPlaylistJob: Job? = null
     private var downloadMediaJob: Job? = null
     private var saveFileJob: Job? = null
-    private var playlist: List<MediaItem> = listOf()
+    private var playlist: List<MediaItem> = listOf()*/
 
-    fun checkPlaylist(appContext: Context) {
+    private var checkPlaylistJob: Job? = null
+
+    fun checkPlaylist() {
         checkPlaylistJob?.cancel()
 
         checkPlaylistJob = scope.launch(Dispatchers.Default) {
             while (true) {
-                if (playlist.isNotEmpty()) {
-                    var foundBrokenPath = false
-                    playlist.forEach {
-                        val mediaPath = it.path
-                        if (mediaPath.isNotEmpty() && !File(mediaPath).exists()) {
-                            if (it.pathBackup.startsWith("http")) it.path = it.pathBackup
-                            foundBrokenPath = true
-                        }
+                //if (playlist.isNotEmpty()) {
+                var foundBrokenPath = false
+                mediaRepo.broadcastList.forEach {
+                    if (it.path == "start" || it.path == "end") return@forEach
+
+                    val mediaPath = it.path
+                    if (mediaPath.isNotEmpty() && !File(mediaPath).exists()) {
+                        if (it.pathBackup.startsWith("http")) it.path = it.pathBackup
+                        foundBrokenPath = true
                     }
-
-                    if (foundBrokenPath) savePlaylist(broadcastList, appContext.filesDir.path)
-
-                    val needDownload = playlist.any {
-                        it.path.startsWith("http") || it.path.isEmpty()
-                    }
-
-                    if (needDownload) downloadMedias(appContext)
-
-                    Log.d("checkplaylist", needDownload.toString())
                 }
+
+                if (foundBrokenPath) mediaRepo.saveItemsToFile(
+                    mediaRepo.broadcastList)//savePlaylist(broadcastList, appContext.filesDir.path)
+
+                val needDownload = mediaRepo.broadcastList.any {
+                    it.path.startsWith("http") || it.path.isEmpty()
+                }
+
+                if (needDownload) mediaRepo.startDownloadMedia() //downloadMedias(appContext)
+
+                Log.d("checkplaylist", needDownload.toString())
+                //}
 
                 delay(30000)
             }
         }
     }
 
-    @Synchronized
+    /*@Synchronized
     fun downloadMedias(appContext: Context) {
         scope.launch {
             downloadMediaJob?.join()
@@ -170,5 +169,5 @@ class MediaDownloadManager(
         }
 
         return fileName
-    }
+    }*/
 }

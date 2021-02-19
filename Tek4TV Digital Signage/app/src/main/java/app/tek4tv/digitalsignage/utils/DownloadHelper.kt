@@ -83,15 +83,17 @@ class DownloadHelper private constructor(
                 })
         }
 
-    suspend fun addToQueue(downloadItem: DownloadItem) {
-        mutex.withLock {
-            val added = addedItem[downloadItem.itDownloadUrl]
-            if (added != null && added) return
-            addedItem[downloadItem.itDownloadUrl] = true
+    fun addToQueue(downloadItem: DownloadItem) {
+        scope.launch {
+            mutex.withLock {
+                val added = addedItem[downloadItem.itDownloadUrl]
+                if (added != null && added) return@launch
+                addedItem[downloadItem.itDownloadUrl] = true
 
-            downloadQueue.add(downloadItem)
+                downloadQueue.add(downloadItem)
 
-            if (!isDownloading) startDownload()
+                if (!isDownloading) startDownload()
+            }
         }
     }
 
