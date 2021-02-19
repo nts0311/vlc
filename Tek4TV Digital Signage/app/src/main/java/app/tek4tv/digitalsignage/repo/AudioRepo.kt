@@ -11,6 +11,7 @@ import com.squareup.moshi.JsonAdapter
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.Types
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -27,12 +28,14 @@ class AudioRepo @Inject constructor(
     override val jsonAdapter: JsonAdapter<List<String>> =
         moshi.adapter(Types.newParameterizedType(List::class.java, String::class.java))
 
-    var audioUrls = listOf<String>()
+    var audioUrls = mutableListOf<String>()
     var audioFileUri = mutableListOf<Uri>()
 
-    private val audioFolderPath = "${appContext.filesDir.path}/$AUDIO_FOLDER_NAME"
+    val audioFolderPath = "${appContext.filesDir.path}/$AUDIO_FOLDER_NAME"
 
     private var downloadAudioJob: Job? = null
+
+    var isDownloadingAudio = false
 
     init {
         audioFileUri = getAllFileNameInFolder(audioFolderPath).map {
@@ -42,14 +45,17 @@ class AudioRepo @Inject constructor(
     }
 
     suspend fun getAudioUrls(url: String, needUpdate: Boolean): List<String> {
-        return if (needUpdate) {
-            audioUrls = fetchAudioUrls(url)
+        audioUrls = if (needUpdate) {
+            audioUrls.clear()
+            audioUrls.addAll(fetchAudioUrls(url))
             saveItemsToFile(audioUrls)
             downloadAudio()
             audioUrls
         } else {
-            readItemsFromFile()
+            readItemsFromFile() as MutableList<String>
         }
+
+        return audioUrls
     }
 
     private suspend fun fetchAudioUrls(url: String): List<String> {
@@ -68,7 +74,9 @@ class AudioRepo @Inject constructor(
     private fun filenameToUri(filename: String) = Uri.parse("file://$audioFolderPath/$filename")
 
     fun downloadAudio() {
-        downloadAudioJob = coroutineScope.launch {
+
+        downloadAudioJob = coroutineScope.launch(Dispatchers.Default) {
+            isDownloadingAudio = true
             if (!isFolderExisted(audioFolderPath)) createFolder(audioFolderPath)
 
             if (audioUrls.isEmpty()) return@launch
@@ -76,10 +84,12 @@ class AudioRepo @Inject constructor(
             audioUrls.forEach { url ->
                 downloadAnAudio(url)
             }
+
+            isDownloadingAudio = false
         }
     }
 
-    private fun downloadAnAudio(url: String) {
+    fun downloadAnAudio(url: String) {
         if (url.isEmpty() || !url.startsWith("http")) return
 
         //if (url.isNotEmpty() && url.startsWith("http")) {

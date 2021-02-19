@@ -3,8 +3,12 @@ package app.tek4tv.digitalsignage.utils
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.PixelFormat
+import android.hardware.display.DisplayManager
 import android.media.AudioManager
+import android.media.ImageReader
 import android.media.MediaRecorder
+import android.media.projection.MediaProjection
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
@@ -14,7 +18,7 @@ import android.view.PixelCopy
 import android.view.SurfaceView
 import android.view.TextureView
 import android.widget.FrameLayout
-import androidx.annotation.RequiresApi
+import androidx.core.graphics.createBitmap
 import androidx.core.view.children
 import app.tek4tv.digitalsignage.network.PlaylistService
 import kotlinx.coroutines.CoroutineScope
@@ -108,8 +112,7 @@ class MediaCapture(
     fun captureScreen(service: PlaylistService, isPortrait: Boolean, mVideoLayout: VLCVideoLayout) {
         scope.launch(Dispatchers.Default) {
             try {
-                val tv: TextureView = (mVideoLayout.getChildAt(
-                    0) as FrameLayout).children.filter { it is TextureView }.first() as TextureView
+                val tv: TextureView = (mVideoLayout.getChildAt(0) as FrameLayout).children.filter { it is TextureView }.first() as TextureView
 
                 val base64Img = withContext(Dispatchers.Default) {
                     val bitmap = if (!isPortrait) ImageResize.getResizedBitmap(tv.bitmap, 640, 360)
@@ -120,9 +123,8 @@ class MediaCapture(
                 }
 
 
-                val body = mapOf(
-                    "Data" to base64Img, "Imei" to Utils.getDeviceId(appContext),
-                    "Extension" to ".jpg")
+                val body = mapOf("Data" to base64Img, "Imei" to Utils.getDeviceId(appContext),
+                                 "Extension" to ".jpg")
 
                 withContext(Dispatchers.IO) {
                     service.postScreenshot(body)
@@ -135,7 +137,6 @@ class MediaCapture(
         }
     }
 
-    @RequiresApi(api = Build.VERSION_CODES.N)
     fun captureSurfaceView(
         service: PlaylistService, isPortrait: Boolean, mVideoLayout: VLCVideoLayout
     ) {
@@ -144,19 +145,18 @@ class MediaCapture(
         scope.launch(Dispatchers.Default) {
 
             try {
-                val surfaceView = (mVideoLayout.getChildAt(
-                    0) as FrameLayout).children.filter { it is SurfaceView }.first() as SurfaceView
+                val surfaceView = (mVideoLayout.getChildAt(0) as FrameLayout).children.filter { it is SurfaceView }.first() as SurfaceView
 
                 val bitmap = if (!isPortrait) Bitmap.createBitmap(640, 360, Bitmap.Config.ARGB_4444)
                 else Bitmap.createBitmap(360, 640, Bitmap.Config.ARGB_4444)
 
                 PixelCopy.request(surfaceView, bitmap, {
                     sendPictureToSever(service, bitmap)
-                    /* val out = FileOutputStream("${appContext.filesDir.path}/img.jpg")
+                    val out = FileOutputStream("${appContext.filesDir.path}/img.jpg")
 
-                     bitmap.compress(Bitmap.CompressFormat.JPEG,100,out)
+                    bitmap.compress(Bitmap.CompressFormat.JPEG, 100, out)
 
-                     out.close()*/
+                    out.close()
                 }, Handler(Looper.getMainLooper()))
             } catch (e: Exception) {
 
@@ -173,11 +173,38 @@ class MediaCapture(
             }
 
             withContext(Dispatchers.IO) {
-                val body = mapOf(
-                    "Data" to base64Img, "Imei" to Utils.getDeviceId(appContext),
-                    "Extension" to ".jpg")
+                val body = mapOf("Data" to base64Img, "Imei" to Utils.getDeviceId(appContext),
+                                 "Extension" to ".jpg")
                 service.postScreenshot(body)
             }
         }
+    }
+
+    fun captureImageMega(mediaProjection: MediaProjection, dpi: Int) {
+        val flags: Int =
+            DisplayManager.VIRTUAL_DISPLAY_FLAG_OWN_CONTENT_ONLY or DisplayManager.VIRTUAL_DISPLAY_FLAG_PUBLIC
+        val imageReader = ImageReader.newInstance(640, 360, PixelFormat.RGBA_8888, 1)
+        val virtualDisplay =
+            mediaProjection.createVirtualDisplay("test", 640, 360, dpi, flags, imageReader.surface,
+                                                 null, null)
+
+        val callback: (ImageReader) -> Unit = {
+            val image = imageReader.acquireLatestImage()
+            val bitmap = createBitmap(640, 360)
+            bitmap.copyPixelsFromBuffer(image.planes[0].buffer.rewind())
+
+            virtualDisplay.release()
+            image.close()
+
+            val fos = FileOutputStream("${appContext.filesDir.path}/img.jpg")
+
+            bitmap.compress(Bitmap.CompressFormat.JPEG, 100, fos)
+
+            fos.close()
+
+
+        }
+
+        imageReader.setOnImageAvailableListener(callback, null)
     }
 }

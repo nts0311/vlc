@@ -1,10 +1,12 @@
 package app.tek4tv.digitalsignage.ui
 
 import android.Manifest
+import android.content.Intent
 import android.content.SharedPreferences
 import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
 import android.media.AudioManager
+import android.media.projection.MediaProjectionManager
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.viewModels
@@ -34,20 +36,19 @@ class MainActivity : AppCompatActivity() {
     private val UPDATE_PERMISSION_REQUEST_CODE = 1
     private val PREF_ORIENTATION = "pref_orientation"
 
-    private val permissions = arrayOf(
-        Manifest.permission.WRITE_EXTERNAL_STORAGE,
-        Manifest.permission.READ_EXTERNAL_STORAGE,
-        Manifest.permission.REQUEST_INSTALL_PACKAGES,
-        Manifest.permission.INTERNET,
-        Manifest.permission.ACCESS_NETWORK_STATE,
-        Manifest.permission.READ_PHONE_STATE,
-        Manifest.permission.READ_PHONE_NUMBERS,
-        Manifest.permission.READ_SMS,
-        Manifest.permission.WRITE_SETTINGS,
-        Manifest.permission.ACCESS_FINE_LOCATION,
-        Manifest.permission.ACCESS_COARSE_LOCATION,
-        Manifest.permission.ACCESS_WIFI_STATE,
-        Manifest.permission.RECORD_AUDIO)
+    private val permissions = arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE,
+                                      Manifest.permission.READ_EXTERNAL_STORAGE,
+                                      Manifest.permission.REQUEST_INSTALL_PACKAGES,
+                                      Manifest.permission.INTERNET,
+                                      Manifest.permission.ACCESS_NETWORK_STATE,
+                                      Manifest.permission.READ_PHONE_STATE,
+                                      Manifest.permission.READ_PHONE_NUMBERS,
+                                      Manifest.permission.READ_SMS,
+                                      Manifest.permission.WRITE_SETTINGS,
+                                      Manifest.permission.ACCESS_FINE_LOCATION,
+                                      Manifest.permission.ACCESS_COARSE_LOCATION,
+                                      Manifest.permission.ACCESS_WIFI_STATE,
+                                      Manifest.permission.RECORD_AUDIO)
 
     private lateinit var mVideoLayout: VLCVideoLayout
 
@@ -77,6 +78,8 @@ class MainActivity : AppCompatActivity() {
     private var orientation: Int = 0
 
     private lateinit var mediaCapture: MediaCapture
+
+    lateinit var mediaProjectionManager: MediaProjectionManager
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -113,10 +116,32 @@ class MainActivity : AppCompatActivity() {
 
         mediaCapture = MediaCapture(applicationContext, lifecycleScope)
 
+        mediaProjectionManager =
+            getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
+
+        startActivityForResult(mediaProjectionManager.createScreenCaptureIntent(), 69)
+
         /*lifecycleScope.launch {
             delay(10000)
-            mediaCapture.updateRecordedAudio("/data/user/0/app.tek4tv.digitalsignage/files/recorded/18022021160554.aac")
+            mediaCapture.captureImageMega(,resources.displayMetrics.densityDpi)
         }*/
+
+
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == 69) {
+
+            lifecycleScope.launch {
+                delay(7000)
+                mediaCapture.captureImageMega(
+                    mediaProjectionManager.getMediaProjection(resultCode, data),
+                    resources.displayMetrics.densityDpi)
+            }
+
+
+        }
     }
 
     override fun onStop() {
@@ -253,8 +278,8 @@ class MainActivity : AppCompatActivity() {
                             val result =
                                 "${locationTracker.mlocation!!.latitude},${locationTracker.mlocation!!.longitude}"
 
-                            hubManager.sendHubDirectMessage(
-                                connectionId, Utils.DEVICE_LOCATION, result)
+                            hubManager.sendHubDirectMessage(connectionId, Utils.DEVICE_LOCATION,
+                                                            result)
                         } else Log.d("location", "location not found")
                     }
                     Status.SET_VOLUME -> {
@@ -270,9 +295,7 @@ class MainActivity : AppCompatActivity() {
                     }
                     Status.RESTART -> {
                         serialPortController.apply {
-                            writeToDevice(
-                                buildReadMessage(
-                                    Define.FUNC_WRITE_RESTART_DEVICE, ""))
+                            writeToDevice(buildReadMessage(Define.FUNC_WRITE_RESTART_DEVICE, ""))
                         }
                     }
                     Status.RELOAD -> {
@@ -283,18 +306,16 @@ class MainActivity : AppCompatActivity() {
                     Status.SET_MUTE_DEVICE -> {
                         if (responseHub.message != null) {
                             serialPortController.apply {
-                                writeToDevice(
-                                    buildWriteMessage(
-                                        Define.FUNC_WRITE_FORCE_SET_MUTE, responseHub.message!!))
+                                writeToDevice(buildWriteMessage(Define.FUNC_WRITE_FORCE_SET_MUTE,
+                                                                responseHub.message!!))
                             }
                         }
                     }
                     Status.SET_VOLUME_DEVICE -> {
                         if (responseHub.message != null) {
                             serialPortController.apply {
-                                writeToDevice(
-                                    buildWriteMessage(
-                                        Define.FUNC_WRITE_FORCE_SET_VOLUME, responseHub.message!!))
+                                writeToDevice(buildWriteMessage(Define.FUNC_WRITE_FORCE_SET_VOLUME,
+                                                                responseHub.message!!))
                             }
                         }
                     }
@@ -309,8 +330,8 @@ class MainActivity : AppCompatActivity() {
                     Status.UPDATE_MUSIC -> {
                         if (responseHub.message != null) {
                             Log.d("Update Music", responseHub.message!!)
-                            viewModel.getAudioListFromNetwork(
-                                applicationContext, responseHub.message!!)
+                            viewModel.getAudioListFromNetwork(applicationContext,
+                                                              responseHub.message!!)
 
                             //playerManager.audioList = viewModel.getAudioList(applicationContext)
                         }
@@ -351,9 +372,8 @@ class MainActivity : AppCompatActivity() {
                     Status.DTMF_STATUS -> {
                         //0: ON, 1:
                         serialPortController.apply {
-                            writeToDevice(
-                                buildWriteMessage(
-                                    Define.FUNC_WRITE_DTMF, responseHub.message ?: ""))
+                            writeToDevice(buildWriteMessage(Define.FUNC_WRITE_DTMF,
+                                                            responseHub.message ?: ""))
                         }
                     }
 
@@ -364,16 +384,15 @@ class MainActivity : AppCompatActivity() {
                             val dataUsage = NetworkUtils.networkUsage(applicationContext)
 
                             val level = when (networkClass) {
-                                "WIFI" -> NetworkUtils.getWifiSignalStrength(
-                                    applicationContext)
+                                "WIFI" -> NetworkUtils.getWifiSignalStrength(applicationContext)
                                 "?" -> 0
                                 else -> NetworkUtils.getCellSignalStrength(applicationContext)
                             }
 
                             val result = "$networkClass,$dataUsage,$level"
 
-                            hubManager.sendHubDirectMessage(
-                                connectionId, Utils.NETWORK_INFO, result)
+                            hubManager.sendHubDirectMessage(connectionId, Utils.NETWORK_INFO,
+                                                            result)
                         }
                     }
 
@@ -392,8 +411,8 @@ class MainActivity : AppCompatActivity() {
                         val connectionId = responseHub.message
                         if (connectionId != null) {
                             val audioList = toJsonList(appStorageManager.getAllMusicPath())
-                            hubManager.sendHubDirectMessage(
-                                connectionId, Utils.GET_AUDIO_PATH, audioList)
+                            hubManager.sendHubDirectMessage(connectionId, Utils.GET_AUDIO_PATH,
+                                                            audioList)
                         }
                     }
 
@@ -402,8 +421,8 @@ class MainActivity : AppCompatActivity() {
                         if (connectionId != null) {
                             Log.d("connectionId", connectionId)
                             val mediaList = toJsonList(appStorageManager.getAllMediaPath())
-                            hubManager.sendHubDirectMessage(
-                                connectionId, Utils.GET_MEDIA_PATH, mediaList)
+                            hubManager.sendHubDirectMessage(connectionId, Utils.GET_MEDIA_PATH,
+                                                            mediaList)
                         }
                     }
 
@@ -445,8 +464,8 @@ class MainActivity : AppCompatActivity() {
                         val connectionId = responseHub.message!!
                         val recordedAudioList =
                             toJsonList(appStorageManager.getAllRecordedAudioPath())
-                        hubManager.sendHubDirectMessage(
-                            connectionId, Utils.GET_RECORD, recordedAudioList)
+                        hubManager.sendHubDirectMessage(connectionId, Utils.GET_RECORD,
+                                                        recordedAudioList)
                     }
 
                     Status.UPLOAD_RECORDED -> {
@@ -472,8 +491,8 @@ class MainActivity : AppCompatActivity() {
             val maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
             val volume = ((maxVolume.toFloat() / 100) * volumeToSet).toInt()
 
-            audioManager.setStreamVolume(
-                AudioManager.STREAM_MUSIC, volume, AudioManager.FLAG_SHOW_UI)
+            audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, volume,
+                                         AudioManager.FLAG_SHOW_UI)
         } catch (e: Exception) {
 
         }

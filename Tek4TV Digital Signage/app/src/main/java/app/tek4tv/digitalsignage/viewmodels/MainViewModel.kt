@@ -6,7 +6,7 @@ import androidx.hilt.lifecycle.ViewModelInject
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import app.tek4tv.digitalsignage.media.MediaDownloadManager
+import app.tek4tv.digitalsignage.media.MediaWatchDog
 import app.tek4tv.digitalsignage.model.MediaItem
 import app.tek4tv.digitalsignage.repo.AudioRepo
 import app.tek4tv.digitalsignage.repo.MediaRepo
@@ -25,7 +25,7 @@ class MainViewModel @ViewModelInject constructor(
 
     private var getPlaylistJob: Job? = null
 
-    private var mediaDownloadManager = MediaDownloadManager(viewModelScope, mediaRepo, audioRepo)
+    private var mediaDownloadManager = MediaWatchDog(viewModelScope, mediaRepo, audioRepo)
 
     var playlistIndex = 0
 
@@ -39,6 +39,7 @@ class MainViewModel @ViewModelInject constructor(
 
         getPlaylistJob = viewModelScope.launch {
             val res = mediaRepo.getBroadcastList(needUpdate)
+            audioRepo.getAudioUrls("", false)
 
             //mediaDownloadManager.broadcastList = res
 
@@ -50,6 +51,7 @@ class MainViewModel @ViewModelInject constructor(
 
     fun checkPlaylist(appContext: Context) {
         mediaDownloadManager.checkPlaylist()
+        mediaDownloadManager.checkAudio()
     }
 
     fun downloadMedias(appContext: Context) {

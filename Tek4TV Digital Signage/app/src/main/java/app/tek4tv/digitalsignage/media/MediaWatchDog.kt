@@ -7,7 +7,7 @@ import app.tek4tv.digitalsignage.utils.*
 import kotlinx.coroutines.*
 import java.io.File
 
-class MediaDownloadManager(
+class MediaWatchDog(
     private val scope: CoroutineScope,
     private val mediaRepo: MediaRepo,
     private val audioRepo: AudioRepo
@@ -31,12 +31,18 @@ class MediaDownloadManager(
     private var playlist: List<MediaItem> = listOf()*/
 
     private var checkPlaylistJob: Job? = null
+    private var checkAudioJob: Job? = null
 
     fun checkPlaylist() {
         checkPlaylistJob?.cancel()
 
         checkPlaylistJob = scope.launch(Dispatchers.Default) {
             while (true) {
+                if (mediaRepo.broadcastList.isEmpty()) {
+                    delay(30000)
+                    continue
+                }
+
                 //if (playlist.isNotEmpty()) {
                 var foundBrokenPath = false
                 mediaRepo.broadcastList.forEach {
@@ -49,19 +55,46 @@ class MediaDownloadManager(
                     }
                 }
 
-                if (foundBrokenPath) mediaRepo.saveItemsToFile(
-                    mediaRepo.broadcastList)//savePlaylist(broadcastList, appContext.filesDir.path)
+                if (foundBrokenPath) mediaRepo.saveItemsToFile(mediaRepo.broadcastList)//savePlaylist(broadcastList, appContext.filesDir.path)
 
-                val needDownload = mediaRepo.broadcastList.any {
-                    it.path.startsWith("http") || it.path.isEmpty()
+                val needDownload = mediaRepo.broadcastList.filter {
+                    it.path.startsWith("http")
                 }
 
-                if (needDownload) mediaRepo.startDownloadMedia() //downloadMedias(appContext)
+                if (needDownload.isNotEmpty()) {
+                    needDownload.forEach {
+                        mediaRepo.downloadAMediaItem(it)
+                    }
+                } //downloadMedias(appContext)
 
-                Log.d("checkplaylist", needDownload.toString())
+                Log.d("checkplaylist", (needDownload.isNotEmpty()).toString())
                 //}
 
                 delay(30000)
+            }
+        }
+    }
+
+    fun checkAudio() {
+        val delayDuration = 180000L
+
+        checkAudioJob?.cancel()
+        checkAudioJob = scope.launch(Dispatchers.Default) {
+            while (true) {
+                if (audioRepo.isDownloadingAudio) {
+                    delay(delayDuration)
+                    continue
+                }
+
+                audioRepo.audioUrls.forEach { url ->
+                    val fileName = getFileNameFromUrl(url)
+
+                    if (isFileExisted(audioRepo.audioFolderPath, fileName)) return@forEach
+
+                    audioRepo.downloadAnAudio(url)
+                }
+
+                delay(delayDuration)
             }
         }
     }

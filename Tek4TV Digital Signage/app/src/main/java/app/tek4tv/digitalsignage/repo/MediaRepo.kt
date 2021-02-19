@@ -29,18 +29,7 @@ class MediaRepo @Inject constructor(
     var body = mapOf(
         "IMEI" to Utils.getDeviceId(appContext)!!)
 
-    var mediaList = listOf<MediaItem>()
-
-    var broadcastList = listOf<MediaItem>()
-        set(value) {
-            field = value
-
-            mediaList = broadcastList.filter {
-                val res = it.path != "start" && it.path != "end"
-                res
-            }
-        }
-
+    var broadcastList = mutableListOf<MediaItem>()
     var scheduledList = mutableMapOf<String, List<MediaItem>>()
     var unscheduledList = mutableListOf<MediaItem>()
 
@@ -54,7 +43,7 @@ class MediaRepo @Inject constructor(
         scheduledList.clear()
         unscheduledList.clear()
 
-        broadcastList = if (needUpdate) {
+        val res = if (needUpdate) {
             updatePlaylist()
         } else {
             val result = if (isFileExisted(mediaStoragePath, PLAYLIST_FILE_NAME)) {
@@ -65,6 +54,9 @@ class MediaRepo @Inject constructor(
             }
             result
         }
+
+        broadcastList.clear()
+        broadcastList.addAll(res)
 
         filterMedia(broadcastList)
         return broadcastList
@@ -128,7 +120,14 @@ class MediaRepo @Inject constructor(
 
         val fileName = getFileNameFromUrl(url)
 
-        if (isFileExisted(mediaStoragePath, fileName)) return
+        if (isFileExisted(mediaStoragePath, fileName)) {
+            it.path = "$mediaStoragePath/$fileName"
+            coroutineScope.launch {
+                saveItemsToFile(broadcastList)
+            }
+            return
+        }
+
 
         downloadHelper.addToQueue(DownloadItem().apply {
             itDownloadUrl = url
@@ -155,12 +154,5 @@ class MediaRepo @Inject constructor(
                 }
             }
         })
-
-        /*if (!isFileExisted(mediaStoragePath, fileName)) {
-
-        } else {
-            it.path = "$mediaStoragePath/$fileName"
-            savePlaylist(broadcastList, mediaStoragePath)
-        }*/
     }
 }
