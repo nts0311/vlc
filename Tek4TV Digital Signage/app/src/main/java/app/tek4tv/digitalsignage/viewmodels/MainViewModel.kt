@@ -25,7 +25,7 @@ class MainViewModel @ViewModelInject constructor(
 
     private var getPlaylistJob: Job? = null
 
-    private var mediaDownloadManager = MediaWatchDog(viewModelScope, mediaRepo, audioRepo)
+    private var mediaWatchdog = MediaWatchDog(viewModelScope, mediaRepo, audioRepo)
 
     var playlistIndex = 0
 
@@ -50,8 +50,8 @@ class MainViewModel @ViewModelInject constructor(
     }
 
     fun checkPlaylist(appContext: Context) {
-        mediaDownloadManager.checkPlaylist()
-        mediaDownloadManager.checkAudio()
+        mediaWatchdog.checkPlaylist()
+        mediaWatchdog.checkAudio()
     }
 
     fun downloadMedias(appContext: Context) {

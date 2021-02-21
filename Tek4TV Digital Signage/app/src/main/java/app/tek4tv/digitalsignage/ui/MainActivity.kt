@@ -37,18 +37,12 @@ class MainActivity : AppCompatActivity() {
     private val PREF_ORIENTATION = "pref_orientation"
 
     private val permissions = arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE,
-                                      Manifest.permission.READ_EXTERNAL_STORAGE,
-                                      Manifest.permission.REQUEST_INSTALL_PACKAGES,
-                                      Manifest.permission.INTERNET,
-                                      Manifest.permission.ACCESS_NETWORK_STATE,
-                                      Manifest.permission.READ_PHONE_STATE,
-                                      Manifest.permission.READ_PHONE_NUMBERS,
-                                      Manifest.permission.READ_SMS,
-                                      Manifest.permission.WRITE_SETTINGS,
-                                      Manifest.permission.ACCESS_FINE_LOCATION,
-                                      Manifest.permission.ACCESS_COARSE_LOCATION,
-                                      Manifest.permission.ACCESS_WIFI_STATE,
-                                      Manifest.permission.RECORD_AUDIO)
+        Manifest.permission.READ_EXTERNAL_STORAGE, Manifest.permission.REQUEST_INSTALL_PACKAGES,
+        Manifest.permission.INTERNET, Manifest.permission.ACCESS_NETWORK_STATE,
+        Manifest.permission.READ_PHONE_STATE, Manifest.permission.READ_PHONE_NUMBERS,
+        Manifest.permission.READ_SMS, Manifest.permission.WRITE_SETTINGS,
+        Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION,
+        Manifest.permission.ACCESS_WIFI_STATE, Manifest.permission.RECORD_AUDIO)
 
     private lateinit var mVideoLayout: VLCVideoLayout
 
@@ -119,7 +113,6 @@ class MainActivity : AppCompatActivity() {
         mediaProjectionManager =
             getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
 
-        startActivityForResult(mediaProjectionManager.createScreenCaptureIntent(), 69)
 
         /*lifecycleScope.launch {
             delay(10000)
@@ -132,15 +125,12 @@ class MainActivity : AppCompatActivity() {
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == 69) {
-
             lifecycleScope.launch {
-                delay(7000)
-                mediaCapture.captureImageMega(
+                val isPortrait = orientation == 2 || orientation == 3
+                mediaCapture.captureImageMega(playlistService,
                     mediaProjectionManager.getMediaProjection(resultCode, data),
-                    resources.displayMetrics.densityDpi)
+                    resources.displayMetrics.densityDpi, isPortrait)
             }
-
-
         }
     }
 
@@ -279,7 +269,7 @@ class MainActivity : AppCompatActivity() {
                                 "${locationTracker.mlocation!!.latitude},${locationTracker.mlocation!!.longitude}"
 
                             hubManager.sendHubDirectMessage(connectionId, Utils.DEVICE_LOCATION,
-                                                            result)
+                                result)
                         } else Log.d("location", "location not found")
                     }
                     Status.SET_VOLUME -> {
@@ -307,7 +297,7 @@ class MainActivity : AppCompatActivity() {
                         if (responseHub.message != null) {
                             serialPortController.apply {
                                 writeToDevice(buildWriteMessage(Define.FUNC_WRITE_FORCE_SET_MUTE,
-                                                                responseHub.message!!))
+                                    responseHub.message!!))
                             }
                         }
                     }
@@ -315,7 +305,7 @@ class MainActivity : AppCompatActivity() {
                         if (responseHub.message != null) {
                             serialPortController.apply {
                                 writeToDevice(buildWriteMessage(Define.FUNC_WRITE_FORCE_SET_VOLUME,
-                                                                responseHub.message!!))
+                                    responseHub.message!!))
                             }
                         }
                     }
@@ -331,7 +321,7 @@ class MainActivity : AppCompatActivity() {
                         if (responseHub.message != null) {
                             Log.d("Update Music", responseHub.message!!)
                             viewModel.getAudioListFromNetwork(applicationContext,
-                                                              responseHub.message!!)
+                                responseHub.message!!)
 
                             //playerManager.audioList = viewModel.getAudioList(applicationContext)
                         }
@@ -373,7 +363,7 @@ class MainActivity : AppCompatActivity() {
                         //0: ON, 1:
                         serialPortController.apply {
                             writeToDevice(buildWriteMessage(Define.FUNC_WRITE_DTMF,
-                                                            responseHub.message ?: ""))
+                                responseHub.message ?: ""))
                         }
                     }
 
@@ -392,7 +382,7 @@ class MainActivity : AppCompatActivity() {
                             val result = "$networkClass,$dataUsage,$level"
 
                             hubManager.sendHubDirectMessage(connectionId, Utils.NETWORK_INFO,
-                                                            result)
+                                result)
                         }
                     }
 
@@ -412,7 +402,7 @@ class MainActivity : AppCompatActivity() {
                         if (connectionId != null) {
                             val audioList = toJsonList(appStorageManager.getAllMusicPath())
                             hubManager.sendHubDirectMessage(connectionId, Utils.GET_AUDIO_PATH,
-                                                            audioList)
+                                audioList)
                         }
                     }
 
@@ -422,7 +412,7 @@ class MainActivity : AppCompatActivity() {
                             Log.d("connectionId", connectionId)
                             val mediaList = toJsonList(appStorageManager.getAllMediaPath())
                             hubManager.sendHubDirectMessage(connectionId, Utils.GET_MEDIA_PATH,
-                                                            mediaList)
+                                mediaList)
                         }
                     }
 
@@ -443,9 +433,11 @@ class MainActivity : AppCompatActivity() {
                     }
 
                     Status.CAPTURE_SCREEN -> {
-                        val isPortrait = orientation == 2 || orientation == 3
-                        mediaCapture.captureSurfaceView(playlistService, isPortrait, mVideoLayout)
+                        /* val isPortrait = orientation == 2 || orientation == 3
+                         mediaCapture.captureSurfaceView(playlistService, isPortrait, mVideoLayout)*/
                         //mediaCapture.captureScreen(playlistService, isPortrait, mVideoLayout)
+                        startActivityForResult(mediaProjectionManager.createScreenCaptureIntent(),
+                            69)
                     }
 
                     Status.RECORD -> {
@@ -465,7 +457,7 @@ class MainActivity : AppCompatActivity() {
                         val recordedAudioList =
                             toJsonList(appStorageManager.getAllRecordedAudioPath())
                         hubManager.sendHubDirectMessage(connectionId, Utils.GET_RECORD,
-                                                        recordedAudioList)
+                            recordedAudioList)
                     }
 
                     Status.UPLOAD_RECORDED -> {
@@ -492,7 +484,7 @@ class MainActivity : AppCompatActivity() {
             val volume = ((maxVolume.toFloat() / 100) * volumeToSet).toInt()
 
             audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, volume,
-                                         AudioManager.FLAG_SHOW_UI)
+                AudioManager.FLAG_SHOW_UI)
         } catch (e: Exception) {
 
         }

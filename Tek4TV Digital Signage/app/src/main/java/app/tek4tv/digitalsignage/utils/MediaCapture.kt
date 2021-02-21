@@ -9,13 +9,8 @@ import android.media.AudioManager
 import android.media.ImageReader
 import android.media.MediaRecorder
 import android.media.projection.MediaProjection
-import android.os.Build
-import android.os.Handler
-import android.os.Looper
 import android.util.Base64
 import android.util.Log
-import android.view.PixelCopy
-import android.view.SurfaceView
 import android.view.TextureView
 import android.widget.FrameLayout
 import androidx.core.graphics.createBitmap
@@ -140,7 +135,7 @@ class MediaCapture(
     fun captureSurfaceView(
         service: PlaylistService, isPortrait: Boolean, mVideoLayout: VLCVideoLayout
     ) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) return
+        /*if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) return
 
         scope.launch(Dispatchers.Default) {
 
@@ -161,7 +156,7 @@ class MediaCapture(
             } catch (e: Exception) {
 
             }
-        }
+        }*/
     }
 
     private fun sendPictureToSever(service: PlaylistService, bitmap: Bitmap) {
@@ -174,37 +169,67 @@ class MediaCapture(
 
             withContext(Dispatchers.IO) {
                 val body = mapOf("Data" to base64Img, "Imei" to Utils.getDeviceId(appContext),
-                                 "Extension" to ".jpg")
+                    "Extension" to ".jpg")
                 service.postScreenshot(body)
             }
         }
     }
 
-    fun captureImageMega(mediaProjection: MediaProjection, dpi: Int) {
-        val flags: Int =
-            DisplayManager.VIRTUAL_DISPLAY_FLAG_OWN_CONTENT_ONLY or DisplayManager.VIRTUAL_DISPLAY_FLAG_PUBLIC
-        val imageReader = ImageReader.newInstance(640, 360, PixelFormat.RGBA_8888, 1)
-        val virtualDisplay =
-            mediaProjection.createVirtualDisplay("test", 640, 360, dpi, flags, imageReader.surface,
-                                                 null, null)
+    fun captureImageMega(
+        playlistService: PlaylistService,
+        mediaProjection: MediaProjection,
+        dpi: Int,
+        isPortrait: Boolean
+    ) {
+        try {
+            val (sw, sh) = if (isPortrait) listOf(360, 640) else listOf(640, 360)
 
-        val callback: (ImageReader) -> Unit = {
-            val image = imageReader.acquireLatestImage()
-            val bitmap = createBitmap(640, 360)
-            bitmap.copyPixelsFromBuffer(image.planes[0].buffer.rewind())
+            val flags: Int =
+                DisplayManager.VIRTUAL_DISPLAY_FLAG_OWN_CONTENT_ONLY or DisplayManager.VIRTUAL_DISPLAY_FLAG_PUBLIC
+            val imageReader = ImageReader.newInstance(sw, sh, PixelFormat.RGBA_8888, 1)
+            val virtualDisplay = mediaProjection.createVirtualDisplay("test", sw, sh, dpi, flags,
+                imageReader.surface, null, null)
 
-            virtualDisplay.release()
-            image.close()
+            val callback: (ImageReader) -> Unit = {
 
-            val fos = FileOutputStream("${appContext.filesDir.path}/img.jpg")
+                scope.launch(Dispatchers.Default) {
+                    try {
+                        val bitmap = copyImageFromVirtualDisplay(imageReader, sw, sh)
+                        virtualDisplay.release()
 
-            bitmap.compress(Bitmap.CompressFormat.JPEG, 100, fos)
+                        if (bitmap != null) {
+                            sendPictureToSever(playlistService, bitmap)
+                            val fos = FileOutputStream("${appContext.filesDir.path}/img.jpg")
+                            bitmap.compress(Bitmap.CompressFormat.JPEG, 100, fos)
+                            fos.close()
+                        }
 
-            fos.close()
+                        mediaProjection.stop()
+                    } catch (e: Exception) {
+                        Log.e("mediacapture", e.toString())
+                    }
+                }
+            }
 
-
+            imageReader.setOnImageAvailableListener(callback, null)
+        } catch (e: Exception) {
+            Log.e("mediacapture", e.toString())
         }
+    }
 
-        imageReader.setOnImageAvailableListener(callback, null)
+    private fun copyImageFromVirtualDisplay(imageReader: ImageReader, sw: Int, sh: Int): Bitmap? {
+        return try {
+            val image = imageReader.acquireLatestImage()
+            val pixelStride = image.planes[0].pixelStride
+            val rowStride = image.planes[0].rowStride
+            val rowPadding = rowStride - pixelStride * sw
+            val bitmap = createBitmap(sw + rowPadding / pixelStride, sh)
+            bitmap.copyPixelsFromBuffer(image.planes[0].buffer.rewind())
+            image.close()
+            bitmap
+        } catch (e: Exception) {
+            Log.e("mediacapture", e.toString())
+            null
+        }
     }
 }
