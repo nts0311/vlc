@@ -133,6 +133,7 @@ class MediaRepo @Inject constructor(
             itDownloadUrl = url
             itStoragePath = mediaStoragePath
             itFileName = fileName
+            priority = if(it.getMediaType() == MediaType.IMAGE) 0 else 1
             downloadListener = object : OnDownloadListener {
                 override fun onDownloadComplete() {
                     it.pathBackup = it.path

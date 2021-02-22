@@ -1,6 +1,8 @@
 package app.tek4tv.digitalsignage.utils
 
 import android.util.Log
+import app.tek4tv.digitalsignage.model.MediaItem
+import app.tek4tv.digitalsignage.model.MediaType
 import com.downloader.Error
 import com.downloader.OnDownloadListener
 import com.downloader.PRDownloader
@@ -8,6 +10,8 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.util.*
+import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.Comparator
 import kotlin.coroutines.resume
 
 class DownloadHelper private constructor(
@@ -16,15 +20,19 @@ class DownloadHelper private constructor(
     private val CHUNK_SIZE = 5
 
     private val addedItem = mutableMapOf<String, Boolean>()
-    private val downloadQueue: Queue<DownloadItem> = LinkedList()
+    private val downloadQueue: Queue<DownloadItem> = PriorityQueue()
     private var isDownloading = false
     private var downloadJob: Job? = null
 
     private val mutex = Mutex()
 
     private fun startDownload() {
-        isDownloading = true
+
         scope.launch(Dispatchers.Default) {
+            mutex.withLock {
+                isDownloading = true
+            }
+
             downloadJob?.join()
             downloadJob = launch {
                 loopDownload()
@@ -33,7 +41,28 @@ class DownloadHelper private constructor(
     }
 
     private suspend fun loopDownload() {
-        while (true) {
+        while (downloadQueue.isNotEmpty())
+        {
+            val head = mutex.withLock {
+                downloadQueue.poll()
+            } ?: continue
+
+            val isDownloadSuccess = downloadSingleItem(head)
+
+            withContext(Dispatchers.Main) {
+                if (isDownloadSuccess) head.downloadListener?.onDownloadComplete()
+                else head.downloadListener?.onError(null)
+            }
+
+            mutex.withLock {
+                addedItem[head.itDownloadUrl] = false
+            }
+        }
+
+        mutex.withLock {
+            isDownloading = false
+        }
+        /*while (true) {
             downloadChunk()
 
             Log.d("downloadx", "finish chunked")
@@ -41,7 +70,7 @@ class DownloadHelper private constructor(
             if (downloadQueue.isEmpty()) break
         }
         isDownloading = false
-        Log.d("downloadx", "finish all")
+        Log.d("downloadx", "finish all")*/
     }
 
     private suspend fun downloadChunk() {
@@ -90,7 +119,7 @@ class DownloadHelper private constructor(
                 if (added != null && added) return@launch
                 addedItem[downloadItem.itDownloadUrl] = true
 
-                downloadQueue.add(downloadItem)
+                downloadQueue.offer(downloadItem)
 
                 if (!isDownloading) startDownload()
             }
@@ -106,9 +135,14 @@ class DownloadHelper private constructor(
     }
 }
 
-class DownloadItem {
+class DownloadItem : Comparable<DownloadItem> {
     var itDownloadUrl = ""
     var itStoragePath = ""
     var itFileName = ""
     var downloadListener: OnDownloadListener? = null
+    var priority = 5
+
+    override fun compareTo(other: DownloadItem): Int {
+        return priority - other.priority
+    }
 }

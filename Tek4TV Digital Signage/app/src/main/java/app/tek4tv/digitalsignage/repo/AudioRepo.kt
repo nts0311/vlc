@@ -100,6 +100,7 @@ class AudioRepo @Inject constructor(
             itDownloadUrl = url
             itStoragePath = audioFolderPath
             itFileName = fileName
+            priority = 2
             downloadListener = object : OnDownloadListener {
                 override fun onDownloadComplete() {
                     audioFileUri.add(filenameToUri(fileName))
