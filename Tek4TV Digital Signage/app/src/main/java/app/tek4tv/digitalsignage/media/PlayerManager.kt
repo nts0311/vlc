@@ -3,15 +3,17 @@ package app.tek4tv.digitalsignage.media
 import android.content.Context
 import android.net.Uri
 import android.util.Log
-import android.view.SurfaceView
-import android.widget.FrameLayout
-import androidx.core.view.children
+import android.view.View
 import app.tek4tv.digitalsignage.Timer
 import app.tek4tv.digitalsignage.model.MediaItem
 import app.tek4tv.digitalsignage.model.MediaType
 import app.tek4tv.digitalsignage.repo.MediaRepo
 import app.tek4tv.digitalsignage.ui.CustomPlayer
 import app.tek4tv.digitalsignage.viewmodels.MainViewModel
+import com.google.android.exoplayer2.ExoPlayer
+import com.google.android.exoplayer2.Player
+import com.google.android.exoplayer2.SimpleExoPlayer
+import com.google.android.exoplayer2.ui.PlayerView
 import kotlinx.coroutines.*
 import org.videolan.libvlc.LibVLC
 import org.videolan.libvlc.Media
@@ -20,10 +22,11 @@ import org.videolan.libvlc.util.VLCVideoLayout
 import java.util.*
 
 class PlayerManager(
-    private var applicationContext: Context,
+    private val applicationContext: Context,
     private var lifecycleScope: CoroutineScope,
     private var viewModel: MainViewModel,
-    var mVideoLayout: VLCVideoLayout
+    var vlcVideoLayout: VLCVideoLayout,
+    var exoVideoView: PlayerView
 ) {
     private var checkScheduledMediaJobId: Long = -1L
 
@@ -36,6 +39,7 @@ class PlayerManager(
     private val mLibVLC: LibVLC
     private val audioPlayer: CustomPlayer
     private val visualPlayer: CustomPlayer
+    private lateinit var exoPlayer: ExoPlayer
 
     private var mainPlayer: CustomPlayer? = null
         set(value) {
@@ -56,15 +60,23 @@ class PlayerManager(
     //HH:mm:ss-HH:mm:ss for scheduled media
     private var currentPlaylistKey = "0"
 
+    var rotationMode = 0
+
     init {
         val args = ArrayList<String>()
         //args.add("-vvv")
-        args.add("--file-caching=5000")
+        args.add("--file-caching=3000")
         args.add("--aout=opensles")
-        args.add("--network-caching=5000")
+        args.add("--network-caching=3000")
         args.add("--no-http-reconnect")
-        args.add("--disc-caching=5000")
-        args.add("--no-drop-late-frames")
+        args.add("--disc-caching=3000")
+        //args.add("--no-drop-late-frames")
+        args.add("--avcodec-hurry-up")
+        args.add("--avcodec-skip-frame=4")
+        args.add("--avcodec-skip-idct=4")
+        args.add("--avcodec-fast")
+        args.add("--avcodec-skiploopfilter=4")
+
 
         timer = Timer(lifecycleScope)
         timer.start()
@@ -78,12 +90,18 @@ class PlayerManager(
         audioPlayer = CustomPlayer(mLibVLC)
 
         audioList = viewModel.audioRepo.audioFileUri
+
+        if (rotationMode != 0) initExoPlayer()
     }
 
     fun attachVisualPlayerView() {
-        visualPlayer.attachViews(mVideoLayout, null, false, false)
-        val sf = (mVideoLayout.getChildAt(0) as FrameLayout).children.filter { it is SurfaceView }
-            .first() as SurfaceView
+        visualPlayer.attachViews(vlcVideoLayout, null, false, true)
+        if (rotationMode != 0) initExoPlayer()
+    }
+
+    private fun initExoPlayer() {
+        exoPlayer = SimpleExoPlayer.Builder(applicationContext).build()
+        exoVideoView.player = exoPlayer
     }
 
     fun playMediaByIndex(index: Int) {
@@ -112,14 +130,23 @@ class PlayerManager(
 
             when (mediaItem.getMediaType()) {
                 MediaType.VIDEO -> {
-                    if (mediaItem.muted) {
-                        mainPlayer = audioPlayer
-                        playMutedVideo(mediaItem)
+                    if (rotationMode == 0) {
+                        if (mediaItem.muted) {
+                            mainPlayer = audioPlayer
+                            playMutedVideo(mediaItem)
+                        } else {
+                            val media = mediaItem.getVlcMedia(mLibVLC)
+                            audioPlayer.stop()
+                            mainPlayer = visualPlayer
+                            visualPlayer.play(media)
+                        }
                     } else {
-                        val media = mediaItem.getVlcMedia(mLibVLC)
-                        audioPlayer.stop()
-                        mainPlayer = visualPlayer
-                        visualPlayer.play(media)
+                        if (mediaItem.muted) {
+                            mainPlayer = audioPlayer
+                            playMutedVideoExo(mediaItem)
+                        } else {
+                            playVideoExo(mediaItem)
+                        }
                     }
                 }
                 MediaType.IMAGE -> {
@@ -136,6 +163,49 @@ class PlayerManager(
         }
     }
 
+    val videoListener = object : Player.EventListener {
+        override fun onPlaybackStateChanged(state: Int) {
+            super.onPlaybackStateChanged(state)
+            if (state == ExoPlayer.STATE_ENDED) playNextMedia()
+        }
+    }
+
+    val mutedVideoListener = object : Player.EventListener {
+        override fun onPlaybackStateChanged(state: Int) {
+            super.onPlaybackStateChanged(state)
+            if (state == ExoPlayer.STATE_ENDED) exoPlayer.seekTo(0)
+        }
+    }
+
+    private fun playVideoExo(videoItem: MediaItem) {
+        if (vlcVideoLayout.visibility == View.VISIBLE) vlcVideoLayout.visibility = View.GONE
+        exoPlayer.audioComponent!!.volume = 1f
+        val exoMediaItem = com.google.android.exoplayer2.MediaItem.fromUri(videoItem.getUri())
+        exoPlayer.setMediaItem(exoMediaItem)
+        exoPlayer.prepare()
+        exoPlayer.play()
+
+        exoPlayer.removeListener(mutedVideoListener)
+        exoPlayer.addListener(videoListener)
+
+    }
+
+    private fun playMutedVideoExo(videoItem: MediaItem) {
+
+        if (vlcVideoLayout.visibility == View.VISIBLE) vlcVideoLayout.visibility = View.GONE
+
+        val exoMediaItem = com.google.android.exoplayer2.MediaItem.fromUri(videoItem.getUri())
+        exoPlayer.setMediaItem(exoMediaItem)
+        exoPlayer.prepare()
+        exoPlayer.play()
+        exoPlayer.audioComponent!!.volume = 0f
+
+        exoPlayer.removeListener(videoListener)
+        exoPlayer.addListener(mutedVideoListener)
+
+        playRandomAudio()
+    }
+
     private fun playMutedVideo(videoItem: MediaItem) {
         val video: Media = videoItem.getVlcMedia(mLibVLC)
         //video.addOption(":no-mediacodec-dr")
@@ -148,7 +218,7 @@ class PlayerManager(
         visualPlayer.eventListener = { event ->
             when (event) {
                 MediaPlayer.Event.EndReached -> {
-                    mVideoLayout.post {
+                    vlcVideoLayout.post {
                         visualPlayer.media = video
                         visualPlayer.play()
                     }
@@ -234,7 +304,7 @@ class PlayerManager(
 
 
     private fun playNextMedia() {
-        mVideoLayout.post {
+        vlcVideoLayout.post {
             val playlist = currentPlaylist
             viewModel.playlistIndex++
             if (viewModel.playlistIndex >= playlist.size) viewModel.playlistIndex = 0

@@ -80,7 +80,7 @@ dependencies {
     implementation 'com.squareup.retrofit2:converter-moshi:2.9.0'
     implementation 'com.squareup.moshi:moshi:1.11.0'
     implementation("com.squareup.moshi:moshi-kotlin:1.11.0")
-    implementation 'androidx.legacy:legacy-support-v4:1.0.0'
+    //implementation 'androidx.legacy:legacy-support-v4:1.0.0'
     kapt("com.squareup.moshi:moshi-kotlin-codegen:1.11.0")
 
     //Hilt
@@ -100,4 +100,9 @@ dependencies {
     implementation 'rongi.rotate-layout:rotate-layout:3.0.0'
 
     implementation 'commons-net:commons-net:3.7.2'
+
+    implementation 'com.google.android.exoplayer:exoplayer-core:2.13.1'
+    implementation 'com.google.android.exoplayer:exoplayer-ui:2.13.1'
+
+    implementation 'rongi.rotate-layout:rotate-layout:3.0.0'
 }

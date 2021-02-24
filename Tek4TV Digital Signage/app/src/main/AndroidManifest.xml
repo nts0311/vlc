@@ -29,7 +29,9 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Tek4TVDigitalSignage"
         android:name=".MyApp">
-        <activity android:name=".ui.MainActivity">
+        <activity
+            android:name=".ui.MainActivity"
+            android:screenOrientation="reverseLandscape">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 

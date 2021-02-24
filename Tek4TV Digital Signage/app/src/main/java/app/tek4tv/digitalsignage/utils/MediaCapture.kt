@@ -9,10 +9,16 @@ import android.media.AudioManager
 import android.media.ImageReader
 import android.media.MediaRecorder
 import android.media.projection.MediaProjection
+import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.util.Base64
 import android.util.Log
+import android.view.PixelCopy
+import android.view.SurfaceView
 import android.view.TextureView
 import android.widget.FrameLayout
+import android.widget.Toast
 import androidx.core.graphics.createBitmap
 import androidx.core.view.children
 import app.tek4tv.digitalsignage.network.PlaylistService
@@ -135,7 +141,7 @@ class MediaCapture(
     fun captureSurfaceView(
         service: PlaylistService, isPortrait: Boolean, mVideoLayout: VLCVideoLayout
     ) {
-        /*if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) return
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) return
 
         scope.launch(Dispatchers.Default) {
 
@@ -146,17 +152,19 @@ class MediaCapture(
                 else Bitmap.createBitmap(360, 640, Bitmap.Config.ARGB_4444)
 
                 PixelCopy.request(surfaceView, bitmap, {
-                    sendPictureToSever(service, bitmap)
+
                     val out = FileOutputStream("${appContext.filesDir.path}/img.jpg")
 
                     bitmap.compress(Bitmap.CompressFormat.JPEG, 100, out)
 
                     out.close()
+
+                    sendPictureToSever(service, bitmap)
                 }, Handler(Looper.getMainLooper()))
             } catch (e: Exception) {
 
             }
-        }*/
+        }
     }
 
     private fun sendPictureToSever(service: PlaylistService, bitmap: Bitmap) {
@@ -167,10 +175,18 @@ class MediaCapture(
                 Base64.encodeToString(bs.toByteArray(), Base64.DEFAULT)
             }
 
+            withContext(Dispatchers.Main) {
+                Toast.makeText(appContext, "to base64", Toast.LENGTH_LONG).show()
+            }
+
             withContext(Dispatchers.IO) {
                 val body = mapOf("Data" to base64Img, "Imei" to Utils.getDeviceId(appContext),
                     "Extension" to ".jpg")
                 service.postScreenshot(body)
+            }
+
+            withContext(Dispatchers.Main) {
+                Toast.makeText(appContext, "send", Toast.LENGTH_LONG).show()
             }
         }
     }
@@ -181,55 +197,62 @@ class MediaCapture(
         dpi: Int,
         isPortrait: Boolean
     ) {
-        try {
-            val (sw, sh) = if (isPortrait) listOf(360, 640) else listOf(640, 360)
+        //try {
+        val (sw, sh) = if (isPortrait) listOf(360, 640) else listOf(640, 360)
 
-            val flags: Int =
-                DisplayManager.VIRTUAL_DISPLAY_FLAG_OWN_CONTENT_ONLY or DisplayManager.VIRTUAL_DISPLAY_FLAG_PUBLIC
-            val imageReader = ImageReader.newInstance(sw, sh, PixelFormat.RGBA_8888, 1)
-            val virtualDisplay = mediaProjection.createVirtualDisplay("test", sw, sh, dpi, flags,
-                imageReader.surface, null, null)
+        val flags: Int =
+            DisplayManager.VIRTUAL_DISPLAY_FLAG_OWN_CONTENT_ONLY or DisplayManager.VIRTUAL_DISPLAY_FLAG_PUBLIC
+        val imageReader = ImageReader.newInstance(sw, sh, PixelFormat.RGBA_8888, 1)
+        val virtualDisplay =
+            mediaProjection.createVirtualDisplay("test", sw, sh, dpi, flags, imageReader.surface,
+                null, null)
 
-            val callback: (ImageReader) -> Unit = {
+        Toast.makeText(appContext, "created virtual display ", Toast.LENGTH_LONG).show()
 
-                scope.launch(Dispatchers.Default) {
-                    try {
-                        val bitmap = copyImageFromVirtualDisplay(imageReader, sw, sh)
-                        virtualDisplay.release()
+        val callback: (ImageReader) -> Unit = {
 
-                        if (bitmap != null) {
-                            sendPictureToSever(playlistService, bitmap)
-                            val fos = FileOutputStream("${appContext.filesDir.path}/img.jpg")
-                            bitmap.compress(Bitmap.CompressFormat.JPEG, 100, fos)
-                            fos.close()
-                        }
+            scope.launch(Dispatchers.Default) {
+                //try {
+                val bitmap = copyImageFromVirtualDisplay(imageReader, sw, sh)
+                virtualDisplay.release()
+
+                if (bitmap != null) {
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(appContext, "image not null", Toast.LENGTH_LONG).show()
+                    }
+
+                    sendPictureToSever(playlistService, bitmap)
+                    val fos = FileOutputStream("${appContext.filesDir.path}/image.jpg")
+                    bitmap.compress(Bitmap.CompressFormat.JPEG, 100, fos)
+                    fos.close()
+                }
 
                         mediaProjection.stop()
-                    } catch (e: Exception) {
-                        Log.e("mediacapture", e.toString())
-                    }
+                /* } catch (e: Exception) {
+                     Log.e("mediacapture", e.toString())
+                 }*/
                 }
             }
 
             imageReader.setOnImageAvailableListener(callback, null)
-        } catch (e: Exception) {
-            Log.e("mediacapture", e.toString())
-        }
+        /* } catch (e: Exception) {
+             Log.e("mediacapture", e.toString())
+         }*/
     }
 
     private fun copyImageFromVirtualDisplay(imageReader: ImageReader, sw: Int, sh: Int): Bitmap? {
-        return try {
-            val image = imageReader.acquireLatestImage()
-            val pixelStride = image.planes[0].pixelStride
-            val rowStride = image.planes[0].rowStride
-            val rowPadding = rowStride - pixelStride * sw
-            val bitmap = createBitmap(sw + rowPadding / pixelStride, sh)
-            bitmap.copyPixelsFromBuffer(image.planes[0].buffer.rewind())
-            image.close()
-            bitmap
-        } catch (e: Exception) {
+        //return try {
+        val image = imageReader.acquireLatestImage()
+        val pixelStride = image.planes[0].pixelStride
+        val rowStride = image.planes[0].rowStride
+        val rowPadding = rowStride - pixelStride * sw
+        val bitmap = createBitmap(sw + rowPadding / pixelStride, sh)
+        bitmap.copyPixelsFromBuffer(image.planes[0].buffer.rewind())
+        image.close()
+        return bitmap
+        /*} catch (e: Exception) {
             Log.e("mediacapture", e.toString())
             null
-        }
+        }*/
     }
 }

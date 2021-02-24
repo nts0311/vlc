@@ -77,6 +77,14 @@ data class MediaItem(
         }
     }
 
+    fun getUri(): Uri {
+        return if (path.isNotEmpty() && File(path).exists()) {
+            Uri.parse("file://$path")
+        } else {
+            Uri.parse(pathBackup)
+        }
+    }
+
     fun getVlcMedia(mLibVLC: LibVLC): Media {
         return if (path.isNotEmpty() && File(path).exists()) {
             Log.d("link", "local: $path")
