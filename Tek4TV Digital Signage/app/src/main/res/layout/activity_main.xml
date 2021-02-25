@@ -8,13 +8,6 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent">
 
-        <com.google.android.exoplayer2.ui.PlayerView
-            android:id="@+id/exo_video_view"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:background="@color/black"
-            app:surface_type="texture_view"
-            app:use_controller="false" />
 
         <org.videolan.libvlc.util.VLCVideoLayout
             android:id="@+id/vlc_video_layout"
@@ -24,7 +17,21 @@
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toTopOf="parent" />
+            app:layout_constraintTop_toTopOf="parent"></org.videolan.libvlc.util.VLCVideoLayout>
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+
+        <ImageView
+            android:id="@+id/imageView"
+            android:layout_width="100dp"
+            android:layout_height="100dp"
+            android:layout_gravity="bottom|right"
+            app:srcCompat="@drawable/icontest" />
+
+
     </FrameLayout>
+
 </com.github.rongi.rotate_layout.layout.RotateLayout>
 

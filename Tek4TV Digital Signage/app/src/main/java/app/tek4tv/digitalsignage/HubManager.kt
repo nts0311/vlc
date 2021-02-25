@@ -180,7 +180,7 @@ class HubManager(
 
     private fun pingTimer() {
         pingHubJob?.cancel()
-        pingHubJob = lifecycleScope.launch {
+        pingHubJob = lifecycleScope.launch(Dispatchers.Default) {
             while (true) {
                 pingHub()
                 Log.d("pingtimer", "ping")

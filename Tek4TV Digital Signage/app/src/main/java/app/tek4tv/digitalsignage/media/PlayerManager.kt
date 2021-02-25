@@ -3,43 +3,39 @@ package app.tek4tv.digitalsignage.media
 import android.content.Context
 import android.net.Uri
 import android.util.Log
-import android.view.View
-import app.tek4tv.digitalsignage.Timer
+import android.view.SurfaceView
+import android.widget.FrameLayout
+import androidx.core.view.children
 import app.tek4tv.digitalsignage.model.MediaItem
 import app.tek4tv.digitalsignage.model.MediaType
 import app.tek4tv.digitalsignage.repo.MediaRepo
 import app.tek4tv.digitalsignage.ui.CustomPlayer
 import app.tek4tv.digitalsignage.viewmodels.MainViewModel
-import com.google.android.exoplayer2.ExoPlayer
-import com.google.android.exoplayer2.Player
-import com.google.android.exoplayer2.SimpleExoPlayer
-import com.google.android.exoplayer2.ui.PlayerView
 import kotlinx.coroutines.*
 import org.videolan.libvlc.LibVLC
 import org.videolan.libvlc.Media
 import org.videolan.libvlc.MediaPlayer
 import org.videolan.libvlc.util.VLCVideoLayout
 import java.util.*
+import kotlin.coroutines.resume
 
 class PlayerManager(
     private val applicationContext: Context,
     private var lifecycleScope: CoroutineScope,
     private var viewModel: MainViewModel,
-    var vlcVideoLayout: VLCVideoLayout,
-    var exoVideoView: PlayerView
+    var vlcVideoLayout: VLCVideoLayout
 ) {
     private var checkScheduledMediaJobId: Long = -1L
 
     private var presentImageJob: Job? = null
 
-    private var timer: Timer
+    /*private var timer: Timer
     private var checkScheduledListTimer: Timer
-    private var checkScheduledMediaListId = -1L
+    private var checkScheduledMediaListId = -1L*/
 
     private val mLibVLC: LibVLC
     private val audioPlayer: CustomPlayer
     private val visualPlayer: CustomPlayer
-    private lateinit var exoPlayer: ExoPlayer
 
     private var mainPlayer: CustomPlayer? = null
         set(value) {
@@ -64,12 +60,10 @@ class PlayerManager(
 
     init {
         val args = ArrayList<String>()
-        //args.add("-vvv")
+        args.add("-vvv")
+        args.add("--codec=avcodec")
         args.add("--file-caching=3000")
-        args.add("--aout=opensles")
-        args.add("--network-caching=3000")
         args.add("--no-http-reconnect")
-        args.add("--disc-caching=3000")
         //args.add("--no-drop-late-frames")
         args.add("--avcodec-hurry-up")
         args.add("--avcodec-skip-frame=4")
@@ -78,12 +72,12 @@ class PlayerManager(
         args.add("--avcodec-skiploopfilter=4")
 
 
-        timer = Timer(lifecycleScope)
+        /*timer = Timer(lifecycleScope)
         timer.start()
 
         checkScheduledListTimer = Timer(lifecycleScope)
         checkScheduledListTimer.delay = 3000
-        checkScheduledListTimer.start()
+        checkScheduledListTimer.start()*/
 
         mLibVLC = LibVLC(applicationContext, args)
         visualPlayer = CustomPlayer(mLibVLC)
@@ -91,18 +85,21 @@ class PlayerManager(
 
         audioList = viewModel.audioRepo.audioFileUri
 
-        if (rotationMode != 0) initExoPlayer()
     }
 
     fun attachVisualPlayerView() {
-        visualPlayer.attachViews(vlcVideoLayout, null, false, true)
-        if (rotationMode != 0) initExoPlayer()
+        visualPlayer.attachViews(vlcVideoLayout, null, false, false)
+        val sf =
+            (vlcVideoLayout.children.first() as FrameLayout).children.filter { it is SurfaceView }
+                .first() as SurfaceView
+        sf.setZOrderOnTop(false)
+        //initExoPlayer()
     }
 
-    private fun initExoPlayer() {
+    /*private fun initExoPlayer() {
         exoPlayer = SimpleExoPlayer.Builder(applicationContext).build()
         exoVideoView.player = exoPlayer
-    }
+    }*/
 
     fun playMediaByIndex(index: Int) {
         try {
@@ -130,27 +127,20 @@ class PlayerManager(
 
             when (mediaItem.getMediaType()) {
                 MediaType.VIDEO -> {
-                    if (rotationMode == 0) {
-                        if (mediaItem.muted) {
-                            mainPlayer = audioPlayer
-                            playMutedVideo(mediaItem)
-                        } else {
-                            val media = mediaItem.getVlcMedia(mLibVLC)
-                            audioPlayer.stop()
-                            mainPlayer = visualPlayer
-                            visualPlayer.play(media)
-                        }
+                    if (mediaItem.muted) {
+                        mainPlayer = audioPlayer
+                        //playMutedVideo(mediaItem)
+                        playMutedMedia(mediaItem)
                     } else {
-                        if (mediaItem.muted) {
-                            mainPlayer = audioPlayer
-                            playMutedVideoExo(mediaItem)
-                        } else {
-                            playVideoExo(mediaItem)
-                        }
+                        val media = mediaItem.getVlcMedia(mLibVLC)
+                        audioPlayer.stop()
+                        mainPlayer = visualPlayer
+                        visualPlayer.play(media)
                     }
                 }
                 MediaType.IMAGE -> {
-                    presentImage(mediaItem)
+                    //presentImage(mediaItem)
+                    playMutedMedia(mediaItem)
                     mainPlayer = audioPlayer
                 }
                 else -> {
@@ -163,54 +153,9 @@ class PlayerManager(
         }
     }
 
-    val videoListener = object : Player.EventListener {
-        override fun onPlaybackStateChanged(state: Int) {
-            super.onPlaybackStateChanged(state)
-            if (state == ExoPlayer.STATE_ENDED) playNextMedia()
-        }
-    }
-
-    val mutedVideoListener = object : Player.EventListener {
-        override fun onPlaybackStateChanged(state: Int) {
-            super.onPlaybackStateChanged(state)
-            if (state == ExoPlayer.STATE_ENDED) exoPlayer.seekTo(0)
-        }
-    }
-
-    private fun playVideoExo(videoItem: MediaItem) {
-        if (vlcVideoLayout.visibility == View.VISIBLE) vlcVideoLayout.visibility = View.GONE
-        exoPlayer.audioComponent!!.volume = 1f
-        val exoMediaItem = com.google.android.exoplayer2.MediaItem.fromUri(videoItem.getUri())
-        exoPlayer.setMediaItem(exoMediaItem)
-        exoPlayer.prepare()
-        exoPlayer.play()
-
-        exoPlayer.removeListener(mutedVideoListener)
-        exoPlayer.addListener(videoListener)
-
-    }
-
-    private fun playMutedVideoExo(videoItem: MediaItem) {
-
-        if (vlcVideoLayout.visibility == View.VISIBLE) vlcVideoLayout.visibility = View.GONE
-
-        val exoMediaItem = com.google.android.exoplayer2.MediaItem.fromUri(videoItem.getUri())
-        exoPlayer.setMediaItem(exoMediaItem)
-        exoPlayer.prepare()
-        exoPlayer.play()
-        exoPlayer.audioComponent!!.volume = 0f
-
-        exoPlayer.removeListener(videoListener)
-        exoPlayer.addListener(mutedVideoListener)
-
-        playRandomAudio()
-    }
-
     private fun playMutedVideo(videoItem: MediaItem) {
         val video: Media = videoItem.getVlcMedia(mLibVLC)
-        //video.addOption(":no-mediacodec-dr")
         video.addOption(":no-audio")
-        //video.addOption(":video-filter=rotate{angle=180}")
         //video.addOption(":video-filter=transform{type=hflip}")
         visualPlayer.media = video
         visualPlayer.play()
@@ -243,7 +188,8 @@ class PlayerManager(
 
         val imageList = mutableListOf(mediaItem)
 
-        imageList.addAll(playlistRepo.unscheduledList.filter { it.getMediaType() == MediaType.IMAGE })
+        imageList.addAll(
+            playlistRepo.unscheduledList.filter { it.getMediaType() == MediaType.IMAGE })
         playRandomAudio()
 
         presentImageJob = lifecycleScope.launch {
@@ -272,6 +218,56 @@ class PlayerManager(
         return 15000L
     }
 
+    //picture and muted video
+    private fun playMutedMedia(firstItem: MediaItem) {
+        val mutedMedia = mutableListOf(firstItem)
+
+        mutedMedia.addAll(currentPlaylist.filter {
+            it.getMediaType() == MediaType.IMAGE || (it.getMediaType() == MediaType.VIDEO && it.muted)
+        }.shuffled())
+
+        playRandomAudio()
+
+        presentImageJob = lifecycleScope.launch {
+            var index = 0
+
+            while (true) {
+                if (index >= mutedMedia.size) index = 0
+
+                val mediaItem = mutedMedia[index]
+
+                when (mediaItem.getMediaType()) {
+                    MediaType.IMAGE -> {
+                        visualPlayer.play(mediaItem.getVlcMedia(mLibVLC))
+                        delay(getMediaDuration(mediaItem))
+                    }
+
+                    MediaType.VIDEO -> {
+                        playMutedVideoItem(mediaItem)
+                        visualPlayer.eventListener = { }
+                    }
+
+                    else -> {
+                    }
+                }
+                index++
+            }
+        }
+    }
+
+    private suspend fun playMutedVideoItem(video: MediaItem) = suspendCancellableCoroutine<Int> {
+        val vlcVideo = video.getVlcMedia(mLibVLC)
+        vlcVideo.addOption(":no-audio")
+        visualPlayer.play(vlcVideo)
+        visualPlayer.eventListener = { event ->
+            when (event) {
+                MediaPlayer.Event.EndReached -> it.resume(0)
+                MediaPlayer.Event.EncounteredError -> it.resume(-1)
+            }
+        }
+        it.invokeOnCancellation { visualPlayer.eventListener = { } }
+    }
+
     private fun playRandomAudio() {
         if (audioList.isEmpty()) {
             audioList = viewModel.audioRepo.audioFileUri
@@ -286,8 +282,7 @@ class PlayerManager(
 
             val audioItem = audioList[audioIndex++]
 
-            val backgroundAudio = Media(
-                mLibVLC, audioItem)
+            val backgroundAudio = Media(mLibVLC, audioItem)
 
 
             val audioName = audioItem.toString()
@@ -296,10 +291,6 @@ class PlayerManager(
             Log.d("audiox", audioItem.toString())
             audioPlayer.play(backgroundAudio)
         } else Log.d("audiox", "no audio")
-    }
-
-    fun playLiveStream() {
-        cancelPlaying()
     }
 
 
@@ -348,12 +339,19 @@ class PlayerManager(
             loopCheckList(Calendar.getInstance().timeInMillis)
         }
 
-        checkScheduledListTimer.removeTimeListener(checkScheduledMediaListId)
+        /*checkScheduledListTimer.removeTimeListener(checkScheduledMediaListId)
 
         checkScheduledMediaListId =
             checkScheduledListTimer.addTimeListener(Dispatchers.Default) { now ->
                 loopCheckList(now)
+            }*/
+
+        lifecycleScope.launch(Dispatchers.Default) {
+            while (true) {
+                loopCheckList(Calendar.getInstance().timeInMillis)
+                delay(3000)
             }
+        }
     }
 
     private suspend fun loopCheckList(now: Long) {
@@ -381,8 +379,8 @@ class PlayerManager(
                 if (currentPlaylistKey != period) {
                     Log.d("scheduledlist", period)
                     withContext(Dispatchers.Main) {
-                        setPlaylistContent(
-                            playlistRepo.scheduledList[period] ?: listOf(), audioList)
+                        setPlaylistContent(playlistRepo.scheduledList[period] ?: listOf(),
+                            audioList)
                         currentPlaylistKey = period
                     }
                 }
@@ -428,47 +426,60 @@ class PlayerManager(
     }
 
     fun checkScheduledMedia() {
-        timer.removeTimeListener(checkScheduledMediaJobId)
+        //timer.removeTimeListener(checkScheduledMediaJobId)
 
-        val playlist = playlistRepo.broadcastList.filter {
+        /*val playlist = playlistRepo.broadcastList.filter {
             it.path != "start" && it.path != "end"
         }
         val scheduledItems: MutableList<MediaItem> = mutableListOf()
         scheduledItems.addAll(playlist.filter { it.fixTime.isNotEmpty() && it.fixTime != "00:00:00" })
 
-        checkScheduledMediaJobId = timer.addTimeListener(Dispatchers.Default) {
-            if (scheduledItems.isEmpty()) {
-                scheduledItems.addAll(playlist.filter { it.fixTime.isNotEmpty() && it.fixTime != "00:00:00" })
+        lifecycleScope.launch(Dispatchers.Default) {
+            while (true)
+            {
+                aaa(playlist, scheduledItems)
+
+                delay(1000)
             }
+        }*/
+
+        /* checkScheduledMediaJobId = timer.addTimeListener(Dispatchers.Default) {
+
+         }*/
+    }
+
+    suspend fun aaa(playlist: List<MediaItem>, scheduledItems: MutableList<MediaItem>) {
+        if (scheduledItems.isEmpty()) {
+            scheduledItems.addAll(
+                playlist.filter { it.fixTime.isNotEmpty() && it.fixTime != "00:00:00" })
+        }
 
 
-            var index = -1
+        var index = -1
 
-            scheduledItems.forEachIndexed { i, mediaItem ->
-                try {
-                    val now = Calendar.getInstance()
-                    val scheduledTime = toCalendar(mediaItem.fixTime)
-                    val mediaDuration = getDurationInSecond(mediaItem.duration ?: "00:00:00")
-                    if (scheduledTime.timeInMillis <= now.timeInMillis && now.timeInMillis <= scheduledTime.timeInMillis + mediaDuration * 1000) {
-                        Log.d(
-                            "hengio",
-                            "${now.timeInMillis} - ${scheduledTime.timeInMillis} - ${scheduledTime.timeInMillis + mediaDuration * 1000}")
+        scheduledItems.forEachIndexed { i, mediaItem ->
+            try {
+                val now = Calendar.getInstance()
+                val scheduledTime = toCalendar(mediaItem.fixTime)
+                val mediaDuration = getDurationInSecond(mediaItem.duration ?: "00:00:00")
+                if (scheduledTime.timeInMillis <= now.timeInMillis && now.timeInMillis <= scheduledTime.timeInMillis + mediaDuration * 1000) {
+                    Log.d("hengio",
+                        "${now.timeInMillis} - ${scheduledTime.timeInMillis} - ${scheduledTime.timeInMillis + mediaDuration * 1000}")
 
-                        if (scheduledItems[i] != viewModel.currentMediaItem) index = i
-                    }
-
-                } catch (e: Exception) {
-                    Log.e("checkScheduledMedia", "error checking media fixtime")
+                    if (scheduledItems[i] != viewModel.currentMediaItem) index = i
                 }
+
+            } catch (e: Exception) {
+                Log.e("checkScheduledMedia", "error checking media fixtime")
             }
+        }
 
-            if (index != -1 && index < scheduledItems.size) {
-                withContext(Dispatchers.Main) {
-                    val mediaToPlay = scheduledItems[index]
-                    playMedia(mediaToPlay)
-                    Log.d("hengio", mediaToPlay.name ?: "")
-                    scheduledItems.removeAt(index)
-                }
+        if (index != -1 && index < scheduledItems.size) {
+            withContext(Dispatchers.Main) {
+                val mediaToPlay = scheduledItems[index]
+                playMedia(mediaToPlay)
+                Log.d("hengio", mediaToPlay.name ?: "")
+                scheduledItems.removeAt(index)
             }
         }
     }
@@ -487,7 +498,7 @@ class PlayerManager(
         mainPlayer?.stop()
         audioPlayer.stop()
         visualPlayer.stop()
-        timer.stop()
+        //timer.stop()
         visualPlayer.detachViews()
     }
 

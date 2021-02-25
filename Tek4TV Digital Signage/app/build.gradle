@@ -101,8 +101,8 @@ dependencies {
 
     implementation 'commons-net:commons-net:3.7.2'
 
-    implementation 'com.google.android.exoplayer:exoplayer-core:2.13.1'
-    implementation 'com.google.android.exoplayer:exoplayer-ui:2.13.1'
+    /*implementation 'com.google.android.exoplayer:exoplayer-core:2.13.1'
+    implementation 'com.google.android.exoplayer:exoplayer-ui:2.13.1'*/
 
     implementation 'rongi.rotate-layout:rotate-layout:3.0.0'
 }

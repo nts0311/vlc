@@ -99,8 +99,7 @@ class MainActivity : AppCompatActivity() {
         serialPortController.connectToSerialPort()*/
 
         mVideoLayout = findViewById(R.id.vlc_video_layout)
-        playerManager = PlayerManager(applicationContext, lifecycleScope, viewModel, mVideoLayout,
-            findViewById(R.id.exo_video_view))
+        playerManager = PlayerManager(applicationContext, lifecycleScope, viewModel, mVideoLayout)
         playerManager.rotationMode = orientation
 
 
@@ -162,12 +161,12 @@ class MainActivity : AppCompatActivity() {
 
         val rotateLayout: RotateLayout = findViewById(R.id.root_layout)
 
-        rotateLayout.angle = when (orientation) {
+        /*rotateLayout.angle = when (orientation) {
             1 -> 180
             2 -> 90
             3 -> -90
             else -> 0
-        }
+        }*/
     }
 
     private fun needGrantPermission(): Boolean {
