@@ -25,7 +25,8 @@ class PlayerManager(
     private var viewModel: MainViewModel,
     var vlcVideoLayout: VLCVideoLayout
 ) {
-    private var checkScheduledMediaJobId: Long = -1L
+    private var checkScheduledMediaJob: Job? = null
+    private var checkScheduledListJob: Job? = null
 
     private var presentImageJob: Job? = null
 
@@ -96,11 +97,6 @@ class PlayerManager(
         //initExoPlayer()
     }
 
-    /*private fun initExoPlayer() {
-        exoPlayer = SimpleExoPlayer.Builder(applicationContext).build()
-        exoVideoView.player = exoPlayer
-    }*/
-
     fun playMediaByIndex(index: Int) {
         try {
             val playlist = currentPlaylist
@@ -142,6 +138,11 @@ class PlayerManager(
                     //presentImage(mediaItem)
                     playMutedMedia(mediaItem)
                     mainPlayer = audioPlayer
+                }
+                MediaType.AUDIO -> {
+                    mainPlayer = audioPlayer
+                    val media = mediaItem.getVlcMedia(mLibVLC)
+                    audioPlayer.play(media)
                 }
                 else -> {
                 }
@@ -346,9 +347,11 @@ class PlayerManager(
                 loopCheckList(now)
             }*/
 
-        lifecycleScope.launch(Dispatchers.Default) {
+        checkScheduledListJob?.cancel()
+        checkScheduledListJob = lifecycleScope.launch(Dispatchers.Default) {
             while (true) {
                 loopCheckList(Calendar.getInstance().timeInMillis)
+                Log.d("checklist", "checked")
                 delay(3000)
             }
         }
@@ -428,20 +431,22 @@ class PlayerManager(
     fun checkScheduledMedia() {
         //timer.removeTimeListener(checkScheduledMediaJobId)
 
-        /*val playlist = playlistRepo.broadcastList.filter {
+        val playlist = playlistRepo.broadcastList.filter {
             it.path != "start" && it.path != "end"
         }
         val scheduledItems: MutableList<MediaItem> = mutableListOf()
-        scheduledItems.addAll(playlist.filter { it.fixTime.isNotEmpty() && it.fixTime != "00:00:00" })
+        scheduledItems.addAll(
+            playlist.filter { it.fixTime.isNotEmpty() && it.fixTime != "00:00:00" })
 
-        lifecycleScope.launch(Dispatchers.Default) {
-            while (true)
-            {
+        checkScheduledMediaJob?.cancel()
+
+        checkScheduledMediaJob = lifecycleScope.launch(Dispatchers.Default) {
+            while (true) {
                 aaa(playlist, scheduledItems)
 
                 delay(1000)
             }
-        }*/
+        }
 
         /* checkScheduledMediaJobId = timer.addTimeListener(Dispatchers.Default) {
 

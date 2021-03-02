@@ -7,8 +7,6 @@
     <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent">
-
-
         <org.videolan.libvlc.util.VLCVideoLayout
             android:id="@+id/vlc_video_layout"
             android:layout_width="match_parent"
@@ -29,9 +27,6 @@
             android:layout_height="100dp"
             android:layout_gravity="bottom|right"
             app:srcCompat="@drawable/icontest" />
-
-
     </FrameLayout>
-
 </com.github.rongi.rotate_layout.layout.RotateLayout>
 
