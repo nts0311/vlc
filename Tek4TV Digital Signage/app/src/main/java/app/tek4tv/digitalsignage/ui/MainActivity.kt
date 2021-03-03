@@ -94,9 +94,8 @@ class MainActivity : AppCompatActivity() {
             handleFromCommandServer(command, message)
         }
 
-        /*serialPortController =
-            SerialPortController(applicationContext, lifecycleScope, hubManager)
-        serialPortController.connectToSerialPort()*/
+        serialPortController = SerialPortController(applicationContext, lifecycleScope, hubManager)
+        serialPortController.connectToSerialPort()
 
         mVideoLayout = findViewById(R.id.vlc_video_layout)
         playerManager = PlayerManager(applicationContext, lifecycleScope, viewModel, mVideoLayout)
@@ -253,11 +252,9 @@ class MainActivity : AppCompatActivity() {
 
                     }
                     Status.UPDATE_STATUS -> {
-                        /*serialPortController.apply {
-                            writeToDevice(
-                                buildReadMessage(
-                                    Define.FUNC_WRITE_READ_STATUS_PARAM, ""))
-                        }*/
+                        serialPortController.apply {
+                            writeToDevice(buildReadMessage(Define.FUNC_WRITE_READ_STATUS_PARAM, ""))
+                        }
                     }
                     Status.GET_LOCATION -> {
                         val connectionId = responseHub.message
