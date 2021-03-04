@@ -2,7 +2,6 @@ package app.tek4tv.digitalsignage
 
 import android.app.Activity
 import android.util.Log
-import app.tek4tv.digitalsignage.media.setSystemTime
 import app.tek4tv.digitalsignage.model.DirectMessage
 import app.tek4tv.digitalsignage.model.PingHubRequest
 import app.tek4tv.digitalsignage.model.ReponseHub
@@ -10,6 +9,7 @@ import app.tek4tv.digitalsignage.model.Video
 import app.tek4tv.digitalsignage.utils.NetworkUtils
 import app.tek4tv.digitalsignage.utils.Status
 import app.tek4tv.digitalsignage.utils.Utils
+import app.tek4tv.digitalsignage.utils.setSystemTime
 import app.tek4tv.digitalsignage.viewmodels.MainViewModel
 import com.microsoft.signalr.HubConnection
 import com.microsoft.signalr.HubConnectionBuilder

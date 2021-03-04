@@ -10,6 +10,8 @@ import app.tek4tv.digitalsignage.model.MediaItem
 import app.tek4tv.digitalsignage.model.MediaType
 import app.tek4tv.digitalsignage.repo.MediaRepo
 import app.tek4tv.digitalsignage.ui.CustomPlayer
+import app.tek4tv.digitalsignage.utils.getDurationInSecond
+import app.tek4tv.digitalsignage.utils.toCalendar
 import app.tek4tv.digitalsignage.viewmodels.MainViewModel
 import kotlinx.coroutines.*
 import org.videolan.libvlc.LibVLC
@@ -86,6 +88,7 @@ class PlayerManager(
 
         audioList = viewModel.audioRepo.audioFileUri
 
+        PlayerManagerHolder.updatePlayerManager(this)
     }
 
     fun attachVisualPlayerView() {

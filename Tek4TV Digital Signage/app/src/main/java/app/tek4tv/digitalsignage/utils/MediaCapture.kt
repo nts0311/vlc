@@ -1,7 +1,6 @@
 package app.tek4tv.digitalsignage.utils
 
 
-//import android.view.PixelCopy
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.PixelFormat
@@ -10,8 +9,13 @@ import android.media.AudioManager
 import android.media.ImageReader
 import android.media.MediaRecorder
 import android.media.projection.MediaProjection
+import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.util.Base64
 import android.util.Log
+import android.view.PixelCopy
+import android.view.SurfaceView
 import android.view.TextureView
 import android.widget.FrameLayout
 import android.widget.Toast
@@ -137,7 +141,7 @@ class MediaCapture(
     fun captureSurfaceView(
         service: PlaylistService, isPortrait: Boolean, mVideoLayout: VLCVideoLayout
     ) {
-        /*if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) return
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) return
 
         scope.launch(Dispatchers.Default) {
 
@@ -160,7 +164,7 @@ class MediaCapture(
             } catch (e: Exception) {
 
             }
-        }*/
+        }
     }
 
     private fun sendPictureToSever(service: PlaylistService, bitmap: Bitmap) {

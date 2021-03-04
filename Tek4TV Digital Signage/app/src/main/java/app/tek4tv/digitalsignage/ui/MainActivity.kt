@@ -187,6 +187,9 @@ class MainActivity : AppCompatActivity() {
             playerManager.onNewBroadcastList()
             playerManager.checkScheduledMedia()
             viewModel.downloadMedias(applicationContext)
+
+            val s = MediaScheduler(applicationContext, viewModel.mediaRepo)
+            s.cancelAllListAlarm()
         }
     }
 

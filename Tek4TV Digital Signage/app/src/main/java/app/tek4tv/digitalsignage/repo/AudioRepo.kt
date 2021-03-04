@@ -52,7 +52,9 @@ class AudioRepo @Inject constructor(
             downloadAudio()
             audioUrls
         } else {
-            readItemsFromFile() as MutableList<String>
+            val itemsFromFile = readItemsFromFile()
+            if (itemsFromFile.isNotEmpty()) readItemsFromFile() as MutableList<String>
+            else mutableListOf()
         }
 
         return audioUrls

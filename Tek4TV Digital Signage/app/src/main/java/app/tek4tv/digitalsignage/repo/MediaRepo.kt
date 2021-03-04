@@ -26,11 +26,11 @@ class MediaRepo @Inject constructor(
     override val jsonAdapter: JsonAdapter<List<MediaItem>> =
         moshi.adapter(Types.newParameterizedType(List::class.java, MediaItem::class.java))
 
-    var body = mapOf(
-        "IMEI" to Utils.getDeviceId(appContext)!!)
+    var body = mapOf("IMEI" to Utils.getDeviceId(appContext)!!)
 
     var broadcastList = mutableListOf<MediaItem>()
-    var scheduledList = mutableMapOf<String, List<MediaItem>>()
+    var scheduledList = LinkedHashMap<String, List<MediaItem>>()
+    var dividers = LinkedHashMap<String, List<MediaItem>>()
     var unscheduledList = mutableListOf<MediaItem>()
 
     private val downloadHelper = DownloadHelper.getInstance(coroutineScope)
@@ -76,6 +76,8 @@ class MediaRepo @Inject constructor(
 
                 val key = "${mediaList[startIndex].fixTime}-${mediaList[endIndex].fixTime}"
                 scheduledList[key] = mediaList.subList(startIndex + 1, endIndex)
+
+                dividers[key] = listOf(broadcastList[startIndex], broadcastList[endIndex])
 
                 //adding the index of scheduled media
                 scheduledIndex.addAll((startIndex..endIndex))

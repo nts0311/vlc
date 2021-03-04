@@ -1,4 +1,4 @@
-package app.tek4tv.digitalsignage.media
+package app.tek4tv.digitalsignage.utils
 
 import android.util.Log
 import java.io.DataOutputStream
