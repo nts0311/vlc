@@ -30,8 +30,9 @@ class MediaRepo @Inject constructor(
 
     var broadcastList = mutableListOf<MediaItem>()
     var scheduledList = LinkedHashMap<String, List<MediaItem>>()
-    var dividers = LinkedHashMap<String, List<MediaItem>>()
+    var timeDividers = LinkedHashMap<String, List<MediaItem>>()
     var unscheduledList = mutableListOf<MediaItem>()
+    var scheduledMediaItems = mutableListOf<MediaItem>()
 
     private val downloadHelper = DownloadHelper.getInstance(coroutineScope)
 
@@ -42,6 +43,7 @@ class MediaRepo @Inject constructor(
     suspend fun getBroadcastList(needUpdate: Boolean): List<MediaItem> {
         scheduledList.clear()
         unscheduledList.clear()
+        scheduledMediaItems.clear()
 
         val res = if (needUpdate) {
             updatePlaylist()
@@ -77,7 +79,7 @@ class MediaRepo @Inject constructor(
                 val key = "${mediaList[startIndex].fixTime}-${mediaList[endIndex].fixTime}"
                 scheduledList[key] = mediaList.subList(startIndex + 1, endIndex)
 
-                dividers[key] = listOf(broadcastList[startIndex], broadcastList[endIndex])
+                timeDividers[key] = listOf(broadcastList[startIndex], broadcastList[endIndex])
 
                 //adding the index of scheduled media
                 scheduledIndex.addAll((startIndex..endIndex))
@@ -87,6 +89,10 @@ class MediaRepo @Inject constructor(
         mediaList.indices.filter { !scheduledIndex.contains(it) }.forEach {
             unscheduledList.add(mediaList[it])
         }
+
+        scheduledMediaItems.addAll(mediaList.filter {
+            it.path != "start" && it.path != "end" && it.fixTime.isNotEmpty() && it.fixTime != "00:00:00"
+        })
     }
 
     suspend fun updatePlaylist(): List<MediaItem> {
@@ -135,7 +141,7 @@ class MediaRepo @Inject constructor(
             itDownloadUrl = url
             itStoragePath = mediaStoragePath
             itFileName = fileName
-            priority = if(it.getMediaType() == MediaType.IMAGE) 0 else 1
+            priority = if (it.getMediaType() == MediaType.IMAGE) 0 else 1
             downloadListener = object : OnDownloadListener {
                 override fun onDownloadComplete() {
                     it.pathBackup = it.path

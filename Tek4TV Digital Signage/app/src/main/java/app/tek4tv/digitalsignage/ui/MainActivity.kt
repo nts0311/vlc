@@ -1,15 +1,12 @@
 package app.tek4tv.digitalsignage.ui
 
 import android.Manifest
-import android.content.Intent
 import android.content.SharedPreferences
 import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
 import android.media.AudioManager
-import android.media.projection.MediaProjectionManager
 import android.os.Bundle
 import android.util.Log
-import android.widget.Toast
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.edit
@@ -75,7 +72,8 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var mediaCapture: MediaCapture
 
-    lateinit var mediaProjectionManager: MediaProjectionManager
+    private lateinit var mediaScheduler: MediaScheduler
+
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -113,8 +111,6 @@ class MainActivity : AppCompatActivity() {
 
         mediaCapture = MediaCapture(applicationContext, lifecycleScope)
 
-        mediaProjectionManager =
-            getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
 
 
         /*lifecycleScope.launch {
@@ -122,31 +118,33 @@ class MainActivity : AppCompatActivity() {
             mediaCapture.captureImageMega(,resources.displayMetrics.densityDpi)
         }*/
 
-
+        mediaScheduler = MediaScheduler(applicationContext, viewModel.mediaRepo)
     }
 
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == 69) {
-            Toast.makeText(this, "capture", Toast.LENGTH_LONG).show()
-            lifecycleScope.launch {
-                val isPortrait = orientation == 2 || orientation == 3
-                mediaCapture.captureImageMega(playlistService,
-                    mediaProjectionManager.getMediaProjection(resultCode, data),
-                    resources.displayMetrics.densityDpi, isPortrait)
-            }
-        }
-    }
+    /* override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+         super.onActivityResult(requestCode, resultCode, data)
+         if (requestCode == 69) {
+             Toast.makeText(this, "capture", Toast.LENGTH_LONG).show()
+             lifecycleScope.launch {
+                 val isPortrait = orientation == 2 || orientation == 3
+                 mediaCapture.captureImageMega(playlistService,
+                     mediaProjectionManager.getMediaProjection(resultCode, data),
+                     resources.displayMetrics.densityDpi, isPortrait)
+             }
+         }
+     }*/
 
     override fun onStop() {
         super.onStop()
         playerManager.onActivityStop()
+        cancelAllAlarm()
     }
 
     override fun onDestroy() {
         super.onDestroy()
         playerManager.onActivityDestroy()
         if (mediaCapture.isRecordingAudio) mediaCapture.stopAudioCapture()
+
     }
 
     override fun onStart() {
@@ -184,12 +182,11 @@ class MainActivity : AppCompatActivity() {
     private fun registerObservers() {
         viewModel.broadcastList.observe(this) {
             playerManager.audioList = viewModel.audioRepo.audioFileUri
-            playerManager.onNewBroadcastList()
-            playerManager.checkScheduledMedia()
+            //playerManager.onNewBroadcastList()
+            //playerManager.checkScheduledMedia()
             viewModel.downloadMedias(applicationContext)
 
-            val s = MediaScheduler(applicationContext, viewModel.mediaRepo)
-            s.cancelAllListAlarm()
+            mediaScheduler.scheduleAllAlarms()
         }
     }
 
@@ -482,10 +479,14 @@ class MainActivity : AppCompatActivity() {
             val volume = ((maxVolume.toFloat() / 100) * volumeToSet).toInt()
 
             audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, volume,
-                AudioManager.FLAG_SHOW_UI)
+                    AudioManager.FLAG_SHOW_UI)
         } catch (e: Exception) {
 
         }
+    }
+
+    fun cancelAllAlarm() {
+        mediaScheduler.cancelAllAlarm()
     }
 }
 

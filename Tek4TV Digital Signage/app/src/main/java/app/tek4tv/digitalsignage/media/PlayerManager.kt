@@ -3,9 +3,6 @@ package app.tek4tv.digitalsignage.media
 import android.content.Context
 import android.net.Uri
 import android.util.Log
-import android.view.SurfaceView
-import android.widget.FrameLayout
-import androidx.core.view.children
 import app.tek4tv.digitalsignage.model.MediaItem
 import app.tek4tv.digitalsignage.model.MediaType
 import app.tek4tv.digitalsignage.repo.MediaRepo
@@ -31,10 +28,6 @@ class PlayerManager(
     private var checkScheduledListJob: Job? = null
 
     private var presentImageJob: Job? = null
-
-    /*private var timer: Timer
-    private var checkScheduledListTimer: Timer
-    private var checkScheduledMediaListId = -1L*/
 
     private val mLibVLC: LibVLC
     private val audioPlayer: CustomPlayer
@@ -67,20 +60,11 @@ class PlayerManager(
         args.add("--codec=avcodec")
         args.add("--file-caching=3000")
         args.add("--no-http-reconnect")
-        //args.add("--no-drop-late-frames")
         args.add("--avcodec-hurry-up")
+        args.add("--avcodec-fast")
         args.add("--avcodec-skip-frame=4")
         args.add("--avcodec-skip-idct=4")
-        args.add("--avcodec-fast")
         args.add("--avcodec-skiploopfilter=4")
-
-
-        /*timer = Timer(lifecycleScope)
-        timer.start()
-
-        checkScheduledListTimer = Timer(lifecycleScope)
-        checkScheduledListTimer.delay = 3000
-        checkScheduledListTimer.start()*/
 
         mLibVLC = LibVLC(applicationContext, args)
         visualPlayer = CustomPlayer(mLibVLC)
@@ -88,16 +72,11 @@ class PlayerManager(
 
         audioList = viewModel.audioRepo.audioFileUri
 
-        PlayerManagerHolder.updatePlayerManager(this)
+        instance = this
     }
 
     fun attachVisualPlayerView() {
         visualPlayer.attachViews(vlcVideoLayout, null, false, false)
-        val sf =
-            (vlcVideoLayout.children.first() as FrameLayout).children.filter { it is SurfaceView }
-                .first() as SurfaceView
-        sf.setZOrderOnTop(false)
-        //initExoPlayer()
     }
 
     fun playMediaByIndex(index: Int) {
@@ -112,6 +91,13 @@ class PlayerManager(
         } catch (e: Exception) {
             e.printStackTrace()
         }
+    }
+
+    fun playScheduledMediaByIndex(mediaIndex: Int) {
+        val scheduledItems = viewModel.mediaRepo.scheduledMediaItems
+        if (mediaIndex >= scheduledItems.size) return
+
+        playMedia(scheduledItems[mediaIndex])
     }
 
     private fun playMedia(mediaItem: MediaItem) {
@@ -331,24 +317,55 @@ class PlayerManager(
         }
     }
 
-    fun onNewBroadcastList() {
+    /*fun onNewBroadcastList() {
         currentPlaylistKey = "0"
         checkScheduledMediaList()
+    }*/
+
+    fun setPlaylist(playlistKey: String) {
+        cancelPlaying()
+        setPlaylistContent(playlistRepo.scheduledList[playlistKey] ?: listOf(), audioList)
     }
 
-    private fun checkScheduledMediaList() {
+    private fun setPlaylistContent(playlist: List<MediaItem>, audios: List<Uri>) {
+        this.currentPlaylist = playlist
+        //this.audioList = audios
+
+        viewModel.playlistIndex = 0
+
+        if (currentPlaylist.isNotEmpty()) {
+
+            //if the first item is scheduled, skip over and play the second media
+            val firstItem = playlist[0]
+            if (firstItem.fixTime != "00:00:00") {
+                val now = Calendar.getInstance()
+                val scheduledTime = toCalendar(firstItem.fixTime)
+
+                if (now.timeInMillis < scheduledTime.timeInMillis && currentPlaylist.size > 2) {
+                    playMediaByIndex(1)
+                    viewModel.playlistIndex = 1
+                    return
+                }
+            }
+
+
+            playMediaByIndex(0)
+        }
+    }
+
+    /*private fun checkScheduledMediaList() {
         //cancelPlaying()
 
         lifecycleScope.launch {
             loopCheckList(Calendar.getInstance().timeInMillis)
         }
 
-        /*checkScheduledListTimer.removeTimeListener(checkScheduledMediaListId)
+        *//*checkScheduledListTimer.removeTimeListener(checkScheduledMediaListId)
 
         checkScheduledMediaListId =
             checkScheduledListTimer.addTimeListener(Dispatchers.Default) { now ->
                 loopCheckList(now)
-            }*/
+            }*//*
 
         checkScheduledListJob?.cancel()
         checkScheduledListJob = lifecycleScope.launch(Dispatchers.Default) {
@@ -405,31 +422,7 @@ class PlayerManager(
         }
     }
 
-    private fun setPlaylistContent(playlist: List<MediaItem>, audios: List<Uri>) {
-        this.currentPlaylist = playlist
-        //this.audioList = audios
 
-        viewModel.playlistIndex = 0
-
-        if (currentPlaylist.isNotEmpty()) {
-
-            //if the first item is scheduled, skip over and play the second media
-            val firstItem = playlist[0]
-            if (firstItem.fixTime != "00:00:00") {
-                val now = Calendar.getInstance()
-                val scheduledTime = toCalendar(firstItem.fixTime)
-
-                if (now.timeInMillis < scheduledTime.timeInMillis && currentPlaylist.size > 2) {
-                    playMediaByIndex(1)
-                    viewModel.playlistIndex = 1
-                    return
-                }
-            }
-
-
-            playMediaByIndex(0)
-        }
-    }
 
     fun checkScheduledMedia() {
         //timer.removeTimeListener(checkScheduledMediaJobId)
@@ -451,9 +444,9 @@ class PlayerManager(
             }
         }
 
-        /* checkScheduledMediaJobId = timer.addTimeListener(Dispatchers.Default) {
+        *//* checkScheduledMediaJobId = timer.addTimeListener(Dispatchers.Default) {
 
-         }*/
+         }*//*
     }
 
     suspend fun aaa(playlist: List<MediaItem>, scheduledItems: MutableList<MediaItem>) {
@@ -490,7 +483,7 @@ class PlayerManager(
                 scheduledItems.removeAt(index)
             }
         }
-    }
+    }*/
 
     fun cancelPlaying() {
         visualPlayer.eventListener = {}
@@ -506,7 +499,7 @@ class PlayerManager(
         mainPlayer?.stop()
         audioPlayer.stop()
         visualPlayer.stop()
-        //timer.stop()
+
         visualPlayer.detachViews()
     }
 
@@ -519,5 +512,10 @@ class PlayerManager(
         if (!visualPlayer.isReleased) visualPlayer.release()
 
         mLibVLC.release()
+    }
+
+
+    companion object {
+        var instance: PlayerManager? = null
     }
 }
