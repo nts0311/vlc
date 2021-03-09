@@ -1,4 +1,4 @@
-package app.tek4tv.digitalsignage.media
+package app.tek4tv.digitalsignage.core
 
 import android.content.Context
 import android.net.Uri
@@ -179,7 +179,7 @@ class PlayerManager(
         val imageList = mutableListOf(mediaItem)
 
         imageList.addAll(
-            playlistRepo.unscheduledList.filter { it.getMediaType() == MediaType.IMAGE })
+                playlistRepo.unscheduledList.filter { it.getMediaType() == MediaType.IMAGE })
         playRandomAudio()
 
         presentImageJob = lifecycleScope.launch {
@@ -285,6 +285,8 @@ class PlayerManager(
 
 
     private fun playNextMedia() {
+        if (currentPlaylistKey == "") return
+
         vlcVideoLayout.post {
             val playlist = currentPlaylist
             viewModel.playlistIndex++
@@ -323,7 +325,8 @@ class PlayerManager(
     }*/
 
     fun setPlaylist(playlistKey: String) {
-        cancelPlaying()
+        stopAllPlayer()
+        currentPlaylistKey = playlistKey
         setPlaylistContent(playlistRepo.scheduledList[playlistKey] ?: listOf(), audioList)
     }
 
@@ -485,7 +488,13 @@ class PlayerManager(
         }
     }*/
 
-    fun cancelPlaying() {
+    fun stopPlaylist(cancelListKey: String) {
+        if (cancelListKey != currentPlaylistKey) return
+        currentPlaylistKey = ""
+        stopAllPlayer()
+    }
+
+    private fun stopAllPlayer() {
         visualPlayer.eventListener = {}
         audioPlayer.eventListener = {}
 

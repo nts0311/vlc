@@ -1,4 +1,4 @@
-package app.tek4tv.digitalsignage.utils
+package app.tek4tv.digitalsignage.core
 
 import android.app.AlarmManager
 import android.app.PendingIntent
@@ -7,6 +7,8 @@ import android.content.Intent
 import android.util.Log
 import app.tek4tv.digitalsignage.repo.MediaRepo
 import app.tek4tv.digitalsignage.ui.AlarmReceiver
+import app.tek4tv.digitalsignage.utils.getDurationInSecond
+import app.tek4tv.digitalsignage.utils.toCalendar
 import java.util.*
 
 class MediaScheduler(private val appContext: Context, private val mediaRepo: MediaRepo) {
@@ -52,14 +54,15 @@ class MediaScheduler(private val appContext: Context, private val mediaRepo: Med
             }
 
             setAlarmForList(period, requestCode, start)
+            setAlarmForList(period, requestCode, end, true)
         }
 
         //setting an alarm when all playlist is played, play nothing
-        if (maxEndKey != "") {
+        /*if (maxEndKey != "") {
             val requestCodeEnd = mediaRepo.timeDividers[maxEndKey]!![1].id
             setAlarmForList(maxEndKey, requestCodeEnd,
                     Calendar.getInstance().apply { timeInMillis = maxEnd }, true)
-        }
+        }*/
     }
 
     private fun setAlarmForList(
@@ -70,7 +73,7 @@ class MediaScheduler(private val appContext: Context, private val mediaRepo: Med
 
         if (isAlarmWorking != null) return
 
-        Log.d("alarmx", "Set $listKey - $requestCode - $time")
+        Log.d("alarmx", "Set $shouldEndPlaying $listKey - $requestCode")
         val alarmIntent = getScheduleListIntent(listKey, requestCode, 0, shouldEndPlaying)
         alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, time.timeInMillis,
                 alarmIntent)
@@ -94,12 +97,13 @@ class MediaScheduler(private val appContext: Context, private val mediaRepo: Med
             }
 
             cancelListAlarm(period, requestCode)
+            cancelListAlarm(period, requestCode, true)
         }
 
-        if (maxEndKey != "") {
+        /*if (maxEndKey != "") {
             val requestCodeEnd = mediaRepo.timeDividers[maxEndKey]!![1].id
             cancelListAlarm(maxEndKey, requestCodeEnd, true)
-        }
+        }*/
     }
 
     private fun cancelListAlarm(
@@ -146,8 +150,12 @@ class MediaScheduler(private val appContext: Context, private val mediaRepo: Med
         mediaRepo.scheduledMediaItems.forEachIndexed { index, mediaItem ->
             val now = Calendar.getInstance()
             val scheduleTime = toCalendar(mediaItem.fixTime)
+            val duration = getDurationInSecond(mediaItem.duration ?: "")
+            val limit = toCalendar(mediaItem.fixTime).apply {
+                add(Calendar.SECOND, duration.toInt())
+            }
 
-            if (now > scheduleTime) return@forEachIndexed
+            if (now > limit) return@forEachIndexed
 
             val isAlarmWorking = getScheduleMediaIntent(index, mediaItem.id,
                     PendingIntent.FLAG_NO_CREATE) != null

@@ -19,6 +19,7 @@ fun toCalendar(time: String): Calendar {
     }
 }
 
+//duration: HH:mm:ss
 fun getDurationInSecond(duration: String): Long {
     return try {
         (duration.split(":").mapIndexed { index, s ->

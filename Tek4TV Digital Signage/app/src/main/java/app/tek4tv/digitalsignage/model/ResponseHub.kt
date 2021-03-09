@@ -5,7 +5,7 @@ import com.squareup.moshi.JsonClass
 import java.io.Serializable
 
 @JsonClass(generateAdapter = true)
-class ReponseHub : Serializable {
+class ResponseHub : Serializable {
     @Json(name = "IMEI")
     var imei: String? = null
 

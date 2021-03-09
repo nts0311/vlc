@@ -1,10 +1,11 @@
-package app.tek4tv.digitalsignage
+package app.tek4tv.digitalsignage.utils
 
 import android.app.Activity
 import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import app.tek4tv.digitalsignage.MyApp
 import app.tek4tv.digitalsignage.ui.MainActivity
 import java.io.BufferedWriter
 import java.io.File

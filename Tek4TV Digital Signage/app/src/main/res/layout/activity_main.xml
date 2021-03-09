@@ -18,7 +18,7 @@
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent" />
 
-        <View
+       <!-- <View
             android:layout_width="match_parent"
             android:layout_height="wrap_content" />
 
@@ -27,7 +27,7 @@
             android:layout_width="100dp"
             android:layout_height="100dp"
             android:layout_gravity="bottom|right"
-            app:srcCompat="@drawable/icontest" />
+            app:srcCompat="@drawable/icontest" />-->
     </FrameLayout>
 </com.github.rongi.rotate_layout.layout.RotateLayout>
 

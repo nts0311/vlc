@@ -1,10 +1,10 @@
-package app.tek4tv.digitalsignage
+package app.tek4tv.digitalsignage.core
 
 import android.app.Activity
 import android.util.Log
 import app.tek4tv.digitalsignage.model.DirectMessage
 import app.tek4tv.digitalsignage.model.PingHubRequest
-import app.tek4tv.digitalsignage.model.ReponseHub
+import app.tek4tv.digitalsignage.model.ResponseHub
 import app.tek4tv.digitalsignage.model.Video
 import app.tek4tv.digitalsignage.utils.NetworkUtils
 import app.tek4tv.digitalsignage.utils.Status
@@ -28,20 +28,21 @@ class HubManager(
     var onMessageListener: (command: String?, message: String?) -> Unit
 ) {
     private val LOG_TAG = "HubConnectionTask"
-
+    private val dateFormat = SimpleDateFormat("dd/MM/yyyy HH:mm:ss")
     private var pingHubJob: Job? = null
-    var lastPing = ""
+    private var openNewConnectionJob: Job? = null
+    private val videoAdapter = moshi.adapter(Video::class.java)
+    private val pingRequestAdapter = moshi.adapter(PingHubRequest::class.java)
+    private val deviceImei = Utils.getDeviceId(mainActivity.applicationContext)
+    private val responseAdapter = moshi.adapter(ResponseHub::class.java)
 
+    var lastPing = ""
     var hubConnection: HubConnection? = null
 
-    private var openNewConnectionJob: Job? = null
-
     //current response Hub
-    var responseHub = ReponseHub()
-
+    var responseHub = ResponseHub()
     var receivedConnectionId = ""
 
-    val dateformat = SimpleDateFormat("dd/MM/yyyy HH:mm:ss")
 
     fun createNewHubConnection() {
         if (openNewConnectionJob != null && openNewConnectionJob!!.isActive) return
@@ -81,11 +82,10 @@ class HubManager(
 
     private fun onMessage() {
         hubConnection?.on("ReceiveMessage", { command: String?, message: String? ->
+            parseHubResponse(message)
             mainActivity.runOnUiThread {
                 Log.d("command", command ?: "")
                 Log.d("message", message ?: "")
-
-                parseHubResponse(message)
 
                 if (command != null && message != null) {
                     when (command) {
@@ -96,8 +96,7 @@ class HubManager(
                         }
 
                         Status.UPDATE_STATUS -> {
-                            if (responseHub.message != null) receivedConnectionId =
-                                responseHub.message!!
+                            if (responseHub.message != null) receivedConnectionId = responseHub.message!!
                         }
                     }
                 }
@@ -110,8 +109,8 @@ class HubManager(
 
     fun sendMessage(mess: String, command: String) {
         try {
-            hubConnection!!.invoke(
-                command, Utils.getDeviceId(mainActivity.applicationContext), mess)
+            hubConnection!!.invoke(command, Utils.getDeviceId(mainActivity.applicationContext),
+                    mess)
         } catch (e: Exception) {
             Log.e(LOG_TAG, e.message)
             e.printStackTrace()
@@ -130,13 +129,11 @@ class HubManager(
     fun sendHubDirectMessage(connectionId: String, command: String, message: String) {
         val directMessage = DirectMessage(Utils.getDeviceId(mainActivity), message)
 
-        sendDirectMessage(
-            connectionId,
-            command,
-            Utils.toJsonString(moshi, DirectMessage::class.java, directMessage))
+        sendDirectMessage(connectionId, command,
+                Utils.toJsonString(moshi, DirectMessage::class.java, directMessage))
     }
 
-    fun pingHub() {
+    private fun pingHub() {
         try {
             if (!mainActivity.isFinishing && hubConnection != null) {
 
@@ -159,22 +156,20 @@ class HubManager(
                     audioName = viewModel.currentAudioName
                 }
 
-                val videoAdapter = moshi.adapter(Video::class.java)
 
-                var request = PingHubRequest().apply {
-                    imei = Utils.getDeviceId(mainActivity.applicationContext)
+                val request = PingHubRequest().apply {
+                    imei = deviceImei
                     status = "START"
                     connectionId = (hubConnection!!.connectionId)
                     this.video = videoAdapter.toJson(video)
-                    startTine = dateformat.format(Date())
+                    startTine = dateFormat.format(Date())
                 }
-                val requestAdapter = moshi.adapter(PingHubRequest::class.java)
-                sendMessage(requestAdapter.toJson(request), Utils.ping)
-                Log.d("request", requestAdapter.toJson(request))
+
+                sendMessage(pingRequestAdapter.toJson(request), Utils.ping)
+                //Log.d("request", pingRequestAdapter.toJson(request))
             }
         } catch (e: java.lang.Exception) {
             e.printStackTrace()
-
         }
     }
 
@@ -191,7 +186,7 @@ class HubManager(
 
                         val now = Calendar.getInstance()
                         val lastPingTime = Calendar.getInstance().apply {
-                            time = dateformat.parse(lastPing)
+                            time = dateFormat.parse(lastPing)
                         }
 
                         if (now.timeInMillis - lastPingTime.timeInMillis > 45000) {
@@ -212,12 +207,10 @@ class HubManager(
 
     private fun parseHubResponse(message: String?) {
         if (message.isNullOrEmpty()) return
-
         try {
-            responseHub = ReponseHub()
+            responseHub = ResponseHub()
             if (message.startsWith("{")) {
-                val jsonAdapter = moshi.adapter(ReponseHub::class.java)
-                responseHub = jsonAdapter.fromJson(message)!!
+                responseHub = responseAdapter.fromJson(message)!!
             }
         } catch (e: Exception) {
             e.printStackTrace()
@@ -226,7 +219,7 @@ class HubManager(
 
     private fun syncTimeWithServer(timeFromServer: String) {
         try {
-            val time = dateformat.parse(timeFromServer)
+            val time = dateFormat.parse(timeFromServer)
             val now = Date()
 
             if (abs(time.time - now.time) >= 3000) {

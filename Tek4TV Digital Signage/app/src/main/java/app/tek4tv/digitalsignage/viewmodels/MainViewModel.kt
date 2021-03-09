@@ -6,10 +6,10 @@ import androidx.hilt.lifecycle.ViewModelInject
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import app.tek4tv.digitalsignage.media.MediaWatchDog
 import app.tek4tv.digitalsignage.model.MediaItem
 import app.tek4tv.digitalsignage.repo.AudioRepo
 import app.tek4tv.digitalsignage.repo.MediaRepo
+import app.tek4tv.digitalsignage.utils.MediaWatchDog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch

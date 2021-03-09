@@ -1,4 +1,4 @@
-package app.tek4tv.digitalsignage
+package app.tek4tv.digitalsignage.core
 
 import android.content.Context
 import android.util.Log
@@ -23,6 +23,13 @@ class SerialPortController(
     private var outputStream: OutputStream? = null
 
     private val UART_NAME = "/dev/ttyS4"
+
+    private val dateformat = SimpleDateFormat("dd/MM/yyyy HH:mm:ss")
+    private val deviceMac = Utils.getMacAddr()
+
+    private var isRead = false
+
+    var dataFinal = StringBuffer()
 
     fun connectToSerialPort() {
         try {
@@ -52,7 +59,6 @@ class SerialPortController(
 
 
         val looseHubConnection = if (hubManager.lastPing != "") {
-            val dateformat = SimpleDateFormat("dd/MM/yyyy HH:mm:ss")
             val now = Calendar.getInstance()
             val lastPingTime = Calendar.getInstance().apply {
                 time = dateformat.parse(hubManager.lastPing)
@@ -78,7 +84,7 @@ class SerialPortController(
                         param = "2"
                     }
                 }
-                param = "$param,${Utils.getMacAddr()}"
+                param = "$param,$deviceMac"
                 val mes: String = buildWriteMessage(Define.FUNC_WRITE_WATCH_DOG, param)
 
                 outputStream!!.write(mes.toByteArray())
@@ -89,7 +95,6 @@ class SerialPortController(
     }
 
 
-    private var isRead = false
     fun buildWriteMessage(funtionId: String, data: String): String {
         val s = "$$,$funtionId,$data,\r\n"
         Log.d("requestdevice", s)
@@ -102,10 +107,6 @@ class SerialPortController(
         Log.d("requestevice", s)
         return s
     }
-
-
-    var dataFinal = StringBuffer()
-
 
     private fun readDevice() {
         coroutineScope.launch {
@@ -134,11 +135,8 @@ class SerialPortController(
                     }
                 }
             }
-
-
         }
     }
-
 
     private fun onDataReceived(data: String?) {
         // read data
@@ -146,11 +144,6 @@ class SerialPortController(
         if (data!!.endsWith("\r\n")) {
             if (data != null && !data.isEmpty() && data.startsWith("$$,")) {
                 if (isRead) {
-                    /*val receiveMessage = DirectMessage(Utils.getDeviceId(appContext), data)
-                    hubManager.sendDirectMessage(
-                        hubManager.receivedConnectionId,
-                        Utils.DEVICE_INFO,
-                        Utils.toJsonString(moshi, DirectMessage::class.java, receiveMessage))*/
                     hubManager.sendHubDirectMessage(
                         hubManager.receivedConnectionId, Utils.DEVICE_INFO, data)
                     isRead = false

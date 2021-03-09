@@ -1,4 +1,4 @@
-package app.tek4tv.digitalsignage;
+package app.tek4tv.digitalsignage.core;
 
 import android.util.Log;
 

@@ -5,7 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.util.Log
 import android.widget.Toast
-import app.tek4tv.digitalsignage.media.PlayerManager
+import app.tek4tv.digitalsignage.core.PlayerManager
 
 
 class AlarmReceiver : BroadcastReceiver() {
@@ -27,9 +27,9 @@ class AlarmReceiver : BroadcastReceiver() {
             ACTION_END_PLAYLIST -> {
                 val listKey = intent.getStringExtra(SCHEDULED_LIST_KEY)
                 Toast.makeText(context, listKey, Toast.LENGTH_LONG).show()
-                Log.d("alarmx", listKey)
+                Log.d("alarmx", "end: $listKey")
 
-
+                playerManager.stopPlaylist(listKey)
             }
 
             ACTION_PLAY_MEDIA -> {

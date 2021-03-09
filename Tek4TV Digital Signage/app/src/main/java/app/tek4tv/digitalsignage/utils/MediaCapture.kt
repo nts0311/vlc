@@ -42,7 +42,7 @@ class MediaCapture(
     private val recordedAudioPath = "${appContext.filesDir.path}/recorded"
     var isRecordingAudio = false
 
-    fun getBestSampleRate(): Int {
+    private fun getBestSampleRate(): Int {
         val am = appContext.getSystemService(Context.AUDIO_SERVICE) as AudioManager
         val sampleRateString = am.getProperty(AudioManager.PROPERTY_OUTPUT_SAMPLE_RATE)
         return sampleRateString?.toInt() ?: 44100
