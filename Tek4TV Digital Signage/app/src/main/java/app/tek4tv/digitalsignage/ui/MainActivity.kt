@@ -204,7 +204,7 @@ class MainActivity : AppCompatActivity() {
         NetworkUtils.instance.mNetworkLive.observe(this) { isConnected ->
             if (isConnected) {
 
-                if (!viewModel.isPlaying) startPlayingMedia()
+                //if (!viewModel.isPlaying) startPlayingMedia()
 
                 if (hubManager.hubConnection == null) {
                     hubManager.createNewHubConnection()

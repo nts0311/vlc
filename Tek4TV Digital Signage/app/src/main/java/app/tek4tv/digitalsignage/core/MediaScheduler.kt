@@ -18,9 +18,6 @@ class MediaScheduler(private val appContext: Context, private val mediaRepo: Med
     private fun scheduleListAlarms() {
         val scheduledList = mediaRepo.scheduledList
 
-        var maxEndKey = ""
-        var maxEnd = 0L
-
         var isNewDayStarted = false
 
         for (i in scheduledList.keys.indices) {
@@ -48,21 +45,9 @@ class MediaScheduler(private val appContext: Context, private val mediaRepo: Med
 
             if (now > end.timeInMillis) continue
 
-            if (end.timeInMillis > maxEnd) {
-                maxEnd = end.timeInMillis
-                maxEndKey = period
-            }
-
             setAlarmForList(period, requestCode, start)
             setAlarmForList(period, requestCode, end, true)
         }
-
-        //setting an alarm when all playlist is played, play nothing
-        /*if (maxEndKey != "") {
-            val requestCodeEnd = mediaRepo.timeDividers[maxEndKey]!![1].id
-            setAlarmForList(maxEndKey, requestCodeEnd,
-                    Calendar.getInstance().apply { timeInMillis = maxEnd }, true)
-        }*/
     }
 
     private fun setAlarmForList(
@@ -81,8 +66,6 @@ class MediaScheduler(private val appContext: Context, private val mediaRepo: Med
 
     private fun cancelAllListAlarm() {
         val scheduledList = mediaRepo.scheduledList
-        var maxEndKey = ""
-        var maxEnd = 0L
 
         for (i in scheduledList.keys.indices) {
             val period = scheduledList.keys.elementAt(i)
@@ -92,18 +75,9 @@ class MediaScheduler(private val appContext: Context, private val mediaRepo: Med
             val t = period.split("-")
             val end = toCalendar(t[1])
 
-            if (end.timeInMillis > maxEnd) {
-                maxEndKey = period
-            }
-
             cancelListAlarm(period, requestCode)
             cancelListAlarm(period, requestCode, true)
         }
-
-        /*if (maxEndKey != "") {
-            val requestCodeEnd = mediaRepo.timeDividers[maxEndKey]!![1].id
-            cancelListAlarm(maxEndKey, requestCodeEnd, true)
-        }*/
     }
 
     private fun cancelListAlarm(
