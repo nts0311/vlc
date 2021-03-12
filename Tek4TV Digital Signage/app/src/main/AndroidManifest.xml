@@ -46,9 +46,7 @@
 
         <receiver
             android:name=".ui.AlarmReceiver"
-            android:directBootAware="true"
-            android:enabled="true"
-            android:exported="true"></receiver>
+            android:enabled="true" />
 
     </application>
 

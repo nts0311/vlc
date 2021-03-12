@@ -94,8 +94,8 @@ class MainActivity : AppCompatActivity() {
             handleFromCommandServer(command, message)
         }
 
-        serialPortController = SerialPortController(applicationContext, lifecycleScope, hubManager)
-        serialPortController.connectToSerialPort()
+        /*serialPortController = SerialPortController(applicationContext, lifecycleScope, hubManager)
+        serialPortController.connectToSerialPort()*/
 
         mVideoLayout = findViewById(R.id.vlc_video_layout)
         playerManager = PlayerManager(applicationContext, lifecycleScope, viewModel, mVideoLayout)
@@ -191,6 +191,7 @@ class MainActivity : AppCompatActivity() {
 
 
             mediaScheduler.scheduleAllAlarms()
+            playerManager.startFirstPlaylist()
         }
     }
 

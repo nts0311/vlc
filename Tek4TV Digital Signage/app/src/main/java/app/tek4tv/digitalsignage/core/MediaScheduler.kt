@@ -24,6 +24,7 @@ class MediaScheduler(private val appContext: Context, private val mediaRepo: Med
             val period = scheduledList.keys.elementAt(i)
 
             val requestCode = mediaRepo.timeDividers[period]!![0].id
+            val endRequestCode = mediaRepo.timeDividers[period]!![1].id
 
             val t = period.split("-")
             val start = toCalendar(t[0])
@@ -43,10 +44,15 @@ class MediaScheduler(private val appContext: Context, private val mediaRepo: Med
 
             val now = Calendar.getInstance().timeInMillis
 
-            if (now > end.timeInMillis) continue
+            if (now in start.timeInMillis..end.timeInMillis) {
+                setAlarmForList(period, endRequestCode, end, true)
+            } else if (now < start.timeInMillis) {
+                setAlarmForList(period, requestCode, start)
+                setAlarmForList(period, endRequestCode, end, true)
+            } else continue
 
-            setAlarmForList(period, requestCode, start)
-            setAlarmForList(period, requestCode, end, true)
+
+            //if (now > start.timeInMillis) continue
         }
     }
 
@@ -71,12 +77,10 @@ class MediaScheduler(private val appContext: Context, private val mediaRepo: Med
             val period = scheduledList.keys.elementAt(i)
 
             val requestCode = mediaRepo.timeDividers[period]!![0].id
-
-            val t = period.split("-")
-            val end = toCalendar(t[1])
+            val endRequestCode = mediaRepo.timeDividers[period]!![1].id
 
             cancelListAlarm(period, requestCode)
-            cancelListAlarm(period, requestCode, true)
+            cancelListAlarm(period, endRequestCode, true)
         }
     }
 

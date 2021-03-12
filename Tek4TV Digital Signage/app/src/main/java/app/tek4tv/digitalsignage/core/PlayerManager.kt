@@ -354,6 +354,23 @@ class PlayerManager(
         }
     }
 
+    fun startFirstPlaylist() {
+        val scheduledList = viewModel.mediaRepo.scheduledList
+        for (i in scheduledList.keys.indices) {
+            val period = scheduledList.keys.elementAt(i)
+            val t = period.split("-")
+            val start = toCalendar(t[0])
+            val end = toCalendar(t[1])
+
+            val now = Calendar.getInstance().timeInMillis
+
+            if (now in start.timeInMillis..end.timeInMillis) {
+                setPlaylist(period)
+                break
+            }
+        }
+    }
+
     fun stopPlaylist(cancelListKey: String) {
         if (cancelListKey != currentPlaylistKey) return
         currentPlaylistKey = ""
@@ -366,8 +383,12 @@ class PlayerManager(
 
         playMutedMediaJob?.cancel()
 
-        visualPlayer.stop()
-        audioPlayer.stop()
+        try {
+            visualPlayer.stop()
+            audioPlayer.stop()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 
     fun onActivityStop() {
