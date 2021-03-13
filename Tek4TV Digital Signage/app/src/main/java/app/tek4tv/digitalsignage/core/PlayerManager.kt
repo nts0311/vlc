@@ -63,9 +63,9 @@ class PlayerManager(
         args.add("--avcodec-skip-idct=4")
         args.add("--avcodec-skiploopfilter=4")
         args.add("--android-display-chroma=RV32")
-
         /*args.add("--video-filter=transform")
-        args.add("--transform-type=90")*/
+        args.add("--transform-type=90")
+        args.add("--no-mediacodec-dr")*/
 
         mLibVLC = LibVLC(applicationContext, args)
         visualPlayer = CustomPlayer(mLibVLC)
