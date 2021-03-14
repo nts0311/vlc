@@ -80,7 +80,10 @@ class PlayerManager(
     }
 
     fun attachVisualPlayerView() {
-        visualPlayer.attachViews(vlcVideoLayout, null, false, false)
+        /**CAUTION: FRAME DROPPING
+         * DO NOT DISABLE subtitles
+         * **/
+        visualPlayer.attachViews(vlcVideoLayout, null, true, false)
     }
 
     fun playMediaByIndex(index: Int) {
