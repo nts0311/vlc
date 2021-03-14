@@ -67,12 +67,12 @@ dependencies {
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.3.0'
     implementation "androidx.activity:activity-ktx:1.1.0"
 
-    implementation 'org.videolan.android:libvlc-all:3.3.14'
+    implementation 'org.videolan.android:libvlc-all:3.3.4'
     //implementation fileTree(include: ['*.aar'], dir: 'libs')
 
     implementation 'com.microsoft.signalr:signalr:5.0.1'
 
-    implementation 'com.google.code.gson:gson:2.8.6'
+    //implementation 'com.google.code.gson:gson:2.8.6'
 
     //Retrofit and Moshi
     implementation 'com.squareup.retrofit2:retrofit:2.9.0'
@@ -103,6 +103,4 @@ dependencies {
 
     /*implementation 'com.google.android.exoplayer:exoplayer-core:2.13.1'
     implementation 'com.google.android.exoplayer:exoplayer-ui:2.13.1'*/
-
-    implementation 'rongi.rotate-layout:rotate-layout:3.0.0'
 }

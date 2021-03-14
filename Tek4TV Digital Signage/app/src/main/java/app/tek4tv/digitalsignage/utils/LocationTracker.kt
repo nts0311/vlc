@@ -12,10 +12,20 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 
 class LocationTracker {
+    lateinit var locationManager : LocationManager
+
     var mlocation: Location? = null
     private val locationListener: LocationListener = object : LocationListener {
         override fun onLocationChanged(location: Location) {
             mlocation = location
+
+            try {
+                locationManager.removeUpdates(this)
+            }
+            catch (e : Exception)
+            {
+                e.printStackTrace()
+            }
         }
 
         override fun onStatusChanged(s: String, i: Int, bundle: Bundle) {}
@@ -25,7 +35,7 @@ class LocationTracker {
 
     fun getLocation(context: Context) {
         try {
-            val locationManager =
+            locationManager =
                 context.getSystemService(AppCompatActivity.LOCATION_SERVICE) as LocationManager
 
             if (ActivityCompat.checkSelfPermission(

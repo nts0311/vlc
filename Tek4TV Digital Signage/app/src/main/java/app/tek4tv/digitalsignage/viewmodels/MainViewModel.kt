@@ -72,5 +72,6 @@ class MainViewModel @ViewModelInject constructor(
     override fun onCleared() {
         super.onCleared()
         audioRepo.cancelAllJob()
+        mediaRepo.cancelAllJob()
     }
 }

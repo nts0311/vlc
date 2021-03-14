@@ -14,17 +14,19 @@ class MediaWatchDog(
 ) {
     private var checkPlaylistJob: Job? = null
     private var checkAudioJob: Job? = null
+    val LOG_TAG = "mediawatchdog"
 
     fun checkPlaylist() {
         checkPlaylistJob?.cancel()
+        val delayDuration = 180000L
 
         checkPlaylistJob = scope.launch(Dispatchers.Default) {
             while (true) {
                 if (mediaRepo.broadcastList.isEmpty()) {
-                    delay(30000)
+                    delay(delayDuration)
                     continue
                 }
-
+                Log.d(LOG_TAG, "begin check media")
                 //if (playlist.isNotEmpty()) {
                 var foundBrokenPath = false
                 mediaRepo.broadcastList.forEach {
@@ -51,8 +53,8 @@ class MediaWatchDog(
 
                 Log.d("checkplaylist", (needDownload.isNotEmpty()).toString())
                 //}
-
-                delay(30000)
+                Log.d(LOG_TAG, "end check media")
+                delay(delayDuration)
             }
         }
     }
@@ -63,6 +65,7 @@ class MediaWatchDog(
         checkAudioJob?.cancel()
         checkAudioJob = scope.launch(Dispatchers.Default) {
             while (true) {
+                Log.d(LOG_TAG, "begin check music")
                 if (audioRepo.isDownloadingAudio) {
                     delay(delayDuration)
                     continue
@@ -75,7 +78,7 @@ class MediaWatchDog(
 
                     audioRepo.downloadAnAudio(url)
                 }
-
+                Log.d(LOG_TAG, "end check music")
                 delay(delayDuration)
             }
         }

@@ -12,6 +12,7 @@ import java.io.InputStream
 import java.io.OutputStream
 import java.text.SimpleDateFormat
 import java.util.*
+import kotlin.jvm.Throws
 
 class SerialPortController(
     private val appContext: Context,

@@ -41,6 +41,7 @@ class DownloadHelper private constructor(
     }
 
     private suspend fun loopDownload() {
+        Log.d("downloadx","begin")
         while (downloadQueue.isNotEmpty())
         {
             val head = mutex.withLock {
@@ -62,6 +63,8 @@ class DownloadHelper private constructor(
         mutex.withLock {
             isDownloading = false
         }
+
+        Log.d("downloadx","end")
         /*while (true) {
             downloadChunk()
 

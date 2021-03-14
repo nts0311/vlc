@@ -1,33 +1,22 @@
-<com.github.rongi.rotate_layout.layout.RotateLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    android:id="@+id/root_layout"
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-    <FrameLayout
+    <org.videolan.libvlc.util.VLCVideoLayout
+        android:id="@+id/vlc_video_layout"
         android:layout_width="match_parent"
-        android:layout_height="match_parent">
+        android:layout_height="match_parent" />
 
-        <org.videolan.libvlc.util.VLCVideoLayout
-            android:id="@+id/vlc_video_layout"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:keepScreenOn="true"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toTopOf="parent" />
+    <!-- <View
+         android:layout_width="match_parent"
+         android:layout_height="wrap_content" />
 
-       <!-- <View
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content" />
-
-        <ImageView
-            android:id="@+id/imageView"
-            android:layout_width="100dp"
-            android:layout_height="100dp"
-            android:layout_gravity="bottom|right"
-            app:srcCompat="@drawable/icontest" />-->
-    </FrameLayout>
-</com.github.rongi.rotate_layout.layout.RotateLayout>
+     <ImageView
+         android:id="@+id/imageView"
+         android:layout_width="100dp"
+         android:layout_height="100dp"
+         android:layout_gravity="bottom|right"
+         app:srcCompat="@drawable/icontest" />-->
+</FrameLayout>
 

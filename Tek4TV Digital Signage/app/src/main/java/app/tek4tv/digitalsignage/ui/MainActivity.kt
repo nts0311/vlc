@@ -1,16 +1,19 @@
 package app.tek4tv.digitalsignage.ui
 
 import android.Manifest
+import android.app.ActivityManager
 import android.content.SharedPreferences
 import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
 import android.media.AudioManager
 import android.os.Bundle
+import android.os.IBinder
 import android.util.Log
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.edit
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.observe
 import app.tek4tv.digitalsignage.*
 import app.tek4tv.digitalsignage.core.HubManager
 import app.tek4tv.digitalsignage.core.MediaScheduler
@@ -57,7 +60,7 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var hubManager: HubManager
     private lateinit var playerManager: PlayerManager
-    private lateinit var audioManager: AudioManager
+    //private lateinit var audioManager: AudioManager
 
     private lateinit var serialPortController: SerialPortController
 
@@ -104,7 +107,7 @@ class MainActivity : AppCompatActivity() {
 
         NetworkUtils.instance.startNetworkListener(this)
 
-        audioManager = getSystemService(AUDIO_SERVICE) as AudioManager
+        //audioManager = getSystemService(AUDIO_SERVICE) as AudioManager
 
         initHubConnect()
         registerObservers()
@@ -112,7 +115,6 @@ class MainActivity : AppCompatActivity() {
         appStorageManager = AppStorageManager(applicationContext)
 
         mediaCapture = MediaCapture(applicationContext, lifecycleScope)
-
 
         mediaScheduler = MediaScheduler(applicationContext, viewModel.mediaRepo)
     }
@@ -160,13 +162,14 @@ class MainActivity : AppCompatActivity() {
             3 -> -90
             else -> 0
         }*/
+        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE
 
-        when (orientation) {
+        /*when (orientation) {
             1 -> requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE
             2 -> requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
             3 -> requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_REVERSE_PORTRAIT
             else -> requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
-        }
+        }*/
     }
 
     private fun needGrantPermission(): Boolean {
@@ -258,9 +261,9 @@ class MainActivity : AppCompatActivity() {
 
                     }
                     Status.UPDATE_STATUS -> {
-                        serialPortController.apply {
+                        /*serialPortController.apply {
                             writeToDevice(buildReadMessage(Define.FUNC_WRITE_READ_STATUS_PARAM, ""))
-                        }
+                        }*/
                     }
                     Status.GET_LOCATION -> {
                         val connectionId = responseHub.message
@@ -425,11 +428,11 @@ class MainActivity : AppCompatActivity() {
                     }
 
                     Status.SET_MUTE_PLAYER -> {
-                        val isMute = responseHub.message
+                        /*val isMute = responseHub.message
                         if (isMute != null) {
                             if (isMute == "1") setVolume(0)
                             else if (isMute == "0") setVolume(100)
-                        }
+                        }*/
                     }
 
                     Status.CAPTURE_SCREEN -> {
@@ -478,7 +481,7 @@ class MainActivity : AppCompatActivity() {
         return adapter.toJson(list)
     }
 
-    private fun setVolume(volumeToSet: Int) {
+    /*private fun setVolume(volumeToSet: Int) {
         try {
             val maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
             val volume = ((maxVolume.toFloat() / 100) * volumeToSet).toInt()
@@ -488,7 +491,7 @@ class MainActivity : AppCompatActivity() {
         } catch (e: Exception) {
 
         }
-    }
+    }*/
 
     fun cancelAllAlarm() {
         mediaScheduler.cancelAllAlarm()

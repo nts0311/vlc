@@ -14,6 +14,7 @@ import kotlinx.coroutines.*
 import org.videolan.libvlc.LibVLC
 import org.videolan.libvlc.Media
 import org.videolan.libvlc.MediaPlayer
+import org.videolan.libvlc.util.VLCUtil
 import org.videolan.libvlc.util.VLCVideoLayout
 import java.util.*
 import kotlin.coroutines.resume
@@ -54,18 +55,19 @@ class PlayerManager(
     init {
         val args = ArrayList<String>()
         args.add("-vvv")
-        args.add("--codec=avcodec")
-        args.add("--file-caching=1000")
+        //args.add("--codec=avcodec")
+        //args.add("--avcodec-codec=h264")
+        args.add("--avcodec-hw=any")
+        args.add("--aout=opensles")
+        //args.add("--file-caching=1000")
         args.add("--no-http-reconnect")
         args.add("--avcodec-hurry-up")
         args.add("--avcodec-fast")
-        args.add("--avcodec-skip-frame=4")
-        args.add("--avcodec-skip-idct=4")
-        args.add("--avcodec-skiploopfilter=4")
-        args.add("--android-display-chroma=RV32")
-        /*args.add("--video-filter=transform")
-        args.add("--transform-type=90")
-        args.add("--no-mediacodec-dr")*/
+        args.add("--avcodec-skip-frame=2")
+        args.add("--avcodec-skip-idct=2")
+        args.add("--avcodec-skiploopfilter=3")
+        args.add("--android-display-chroma=YV12")
+
 
         mLibVLC = LibVLC(applicationContext, args)
         visualPlayer = CustomPlayer(mLibVLC)
@@ -114,16 +116,17 @@ class PlayerManager(
 
             when (mediaItem.getMediaType()) {
                 MediaType.VIDEO -> {
-                    if (mediaItem.muted) {
+                   /* if (mediaItem.muted) {
                         mainPlayer = audioPlayer
                         //playMutedVideo(mediaItem)
                         playMutedMedia(mediaItem)
-                    } else {
+                    } else {*/
                         val media = mediaItem.getVlcMedia(mLibVLC)
+                        media.setHWDecoderEnabled(true, true)
                         audioPlayer.stop()
                         mainPlayer = visualPlayer
                         visualPlayer.play(media)
-                    }
+                    //}
                 }
                 MediaType.IMAGE -> {
                     //presentImage(mediaItem)
@@ -250,6 +253,10 @@ class PlayerManager(
     private suspend fun playMutedVideoItem(video: MediaItem) = suspendCancellableCoroutine<Int> {
         val vlcVideo = video.getVlcMedia(mLibVLC)
         vlcVideo.addOption(":no-audio")
+        /*vlcVideo.addOption(":no-mediacodec-dr")
+        vlcVideo.addOption(":no-omxil-dr")*/
+
+        vlcVideo.setHWDecoderEnabled(true, true)
         visualPlayer.play(vlcVideo)
         visualPlayer.eventListener = { event ->
             when (event) {
@@ -324,8 +331,18 @@ class PlayerManager(
 
     fun setPlaylist(playlistKey: String) {
         stopAllPlayer()
-        currentPlaylistKey = playlistKey
-        setPlaylistContent(playlistRepo.scheduledList[playlistKey] ?: listOf(), audioList)
+
+        if(playlistKey=="-1")
+        {
+            currentPlaylistKey = "-1"
+            setPlaylistContent(playlistRepo.unscheduledList, audioList)
+        }
+        else
+        {
+            currentPlaylistKey = playlistKey
+            setPlaylistContent(playlistRepo.scheduledList[playlistKey] ?: listOf(), audioList)
+        }
+
     }
 
     private fun setPlaylistContent(playlist: List<MediaItem>, audios: List<Uri>) {
@@ -355,6 +372,7 @@ class PlayerManager(
     }
 
     fun startFirstPlaylist() {
+        var found = false
         val scheduledList = viewModel.mediaRepo.scheduledList
         for (i in scheduledList.keys.indices) {
             val period = scheduledList.keys.elementAt(i)
@@ -366,9 +384,14 @@ class PlayerManager(
 
             if (now in start.timeInMillis..end.timeInMillis) {
                 setPlaylist(period)
+                found = true
                 break
             }
         }
+
+        //random playlist
+        if(!found)
+            setPlaylist("-1")
     }
 
     fun stopPlaylist(cancelListKey: String) {
