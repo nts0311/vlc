@@ -2,7 +2,12 @@ package app.tek4tv.digitalsignage.core
 
 import android.content.Context
 import android.net.Uri
+import android.util.LayoutDirection
 import android.util.Log
+import android.view.SurfaceView
+import android.view.ViewGroup
+import android.widget.FrameLayout
+import androidx.core.view.children
 import app.tek4tv.digitalsignage.model.MediaItem
 import app.tek4tv.digitalsignage.model.MediaType
 import app.tek4tv.digitalsignage.repo.MediaRepo
@@ -67,6 +72,10 @@ class PlayerManager(
         args.add("--avcodec-skip-idct=2")
         args.add("--avcodec-skiploopfilter=3")
         args.add("--android-display-chroma=YV12")
+        /*args.add("--no-mediacodec-dr")
+        args.add("--no-omxil-dr")
+        args.add("--video-filter=transform")
+        args.add("--transform-type=90")*/
 
 
         mLibVLC = LibVLC(applicationContext, args)
@@ -84,6 +93,10 @@ class PlayerManager(
          * DO NOT DISABLE subtitles
          * **/
         visualPlayer.attachViews(vlcVideoLayout, null, true, false)
+        val sf = (vlcVideoLayout.getChildAt(0) as FrameLayout).children.filter { it is SurfaceView }.first() as SurfaceView
+
+        //sf.layout(100,100,300,300)
+        //sf.
     }
 
     fun playMediaByIndex(index: Int) {
@@ -119,17 +132,17 @@ class PlayerManager(
 
             when (mediaItem.getMediaType()) {
                 MediaType.VIDEO -> {
-                   /* if (mediaItem.muted) {
+                    if (mediaItem.muted) {
                         mainPlayer = audioPlayer
                         //playMutedVideo(mediaItem)
                         playMutedMedia(mediaItem)
-                    } else {*/
+                    } else {
                         val media = mediaItem.getVlcMedia(mLibVLC)
                         media.setHWDecoderEnabled(true, true)
                         audioPlayer.stop()
                         mainPlayer = visualPlayer
                         visualPlayer.play(media)
-                    //}
+                    }
                 }
                 MediaType.IMAGE -> {
                     //presentImage(mediaItem)

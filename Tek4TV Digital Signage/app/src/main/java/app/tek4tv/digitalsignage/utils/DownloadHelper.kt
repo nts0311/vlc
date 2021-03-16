@@ -41,9 +41,8 @@ class DownloadHelper private constructor(
     }
 
     private suspend fun loopDownload() {
-        Log.d("downloadx","begin")
-        while (downloadQueue.isNotEmpty())
-        {
+        Log.d("downloadx", "begin")
+        while (downloadQueue.isNotEmpty()) {
             val head = mutex.withLock {
                 downloadQueue.poll()
             } ?: continue
@@ -64,7 +63,7 @@ class DownloadHelper private constructor(
             isDownloading = false
         }
 
-        Log.d("downloadx","end")
+        Log.d("downloadx", "end")
         /*while (true) {
             downloadChunk()
 
@@ -148,4 +147,8 @@ class DownloadItem : Comparable<DownloadItem> {
     override fun compareTo(other: DownloadItem): Int {
         return priority - other.priority
     }
+}
+
+class DownloadHelper2 {
+
 }

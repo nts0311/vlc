@@ -1,36 +1,31 @@
 package app.tek4tv.digitalsignage.ui
 
 import android.Manifest
-import android.app.ActivityManager
 import android.content.SharedPreferences
 import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
-import android.media.AudioManager
 import android.os.Bundle
-import android.os.IBinder
 import android.util.Log
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.edit
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.observe
-import app.tek4tv.digitalsignage.*
+import app.tek4tv.digitalsignage.MyApp
+import app.tek4tv.digitalsignage.R
 import app.tek4tv.digitalsignage.core.HubManager
 import app.tek4tv.digitalsignage.core.MediaScheduler
 import app.tek4tv.digitalsignage.core.PlayerManager
 import app.tek4tv.digitalsignage.core.SerialPortController
-import app.tek4tv.digitalsignage.model.*
 import app.tek4tv.digitalsignage.network.PlaylistService
 import app.tek4tv.digitalsignage.utils.*
 import app.tek4tv.digitalsignage.viewmodels.MainViewModel
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.Types
 import dagger.hilt.android.AndroidEntryPoint
-import kotlinx.coroutines.*
-import org.videolan.libvlc.*
 import org.videolan.libvlc.util.VLCVideoLayout
-import java.io.*
-import java.util.*
+import java.io.BufferedReader
+import java.io.InputStreamReader
 import javax.inject.Inject
 
 
@@ -46,7 +41,7 @@ class MainActivity : AppCompatActivity() {
             Manifest.permission.READ_PHONE_STATE, Manifest.permission.READ_PHONE_NUMBERS,
             Manifest.permission.READ_SMS, Manifest.permission.WRITE_SETTINGS,
             Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION,
-            Manifest.permission.ACCESS_WIFI_STATE, Manifest.permission.RECORD_AUDIO)
+            Manifest.permission.ACCESS_WIFI_STATE, Manifest.permission.RECORD_AUDIO, Manifest.permission.SYSTEM_ALERT_WINDOW)
 
     private lateinit var mVideoLayout: VLCVideoLayout
 
@@ -152,23 +147,12 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setViewOrientation() {
-        /*requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
-
-        val rotateLayout: RotateLayout = findViewById(R.id.root_layout)
-
-        rotateLayout.angle = when (orientation) {
-            1 -> 180
-            2 -> 90
-            3 -> -90
-            else -> 0
-        }*/
-        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE
-
-        /*when (orientation) {
-            1 -> requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE
-            2 -> requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
-            3 -> requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_REVERSE_PORTRAIT
-            else -> requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+        /*requestedOrientation = when (orientation) {
+            1 -> ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE
+            2 -> ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+            3 -> ActivityInfo.SCREEN_ORIENTATION_REVERSE_PORTRAIT
+            else -> ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
         }*/
     }
 
